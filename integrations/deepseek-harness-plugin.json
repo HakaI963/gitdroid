@@ -1,0 +1,51 @@
+{
+  "name": "gitdroid",
+  "displayName": "GitDroid",
+  "version": "1.0.0",
+  "description": "Drive the GitHub account signed in on your Android phone, straight from the DeepSeek harness.",
+  "author": {
+    "name": "GitDroid"
+  },
+  "type": "mcp",
+  "mcp": {
+    "transport": "streamable-http",
+    "url": "http://127.0.0.1:8787/mcp",
+    "env": {
+      "GITDROID_TOKEN": "REPLACE_WITH_YOUR_TOKEN"
+    },
+    "headers": {
+      "Authorization": "Bearer REPLACE_WITH_YOUR_TOKEN"
+    }
+  },
+  "tools": [
+    "list_repositories",
+    "get_repository",
+    "get_file_contents",
+    "get_repository_tree",
+    "list_branches",
+    "list_commits",
+    "list_tags",
+    "list_releases",
+    "search_repositories",
+    "search_code",
+    "create_repository",
+    "update_repository",
+    "delete_repository",
+    "fork_repository",
+    "create_or_update_file",
+    "delete_file",
+    "create_branch",
+    "list_issues",
+    "create_issue",
+    "update_issue",
+    "list_pull_requests",
+    "create_pull_request",
+    "merge_pull_request",
+    "list_workflows",
+    "list_workflow_runs",
+    "rerun_workflow",
+    "cancel_workflow_run",
+    "dispatch_workflow"
+  ],
+  "instructions": "GitDroid exposes the GitHub account that is signed in on the user's Android phone. The tool names match the official GitHub MCP server, so the same calls work against either. The phone must be reachable: use `adb reverse tcp:8787 tcp:8787` for a tethered device, or the LAN address shown on the app's MCP tab."
+}

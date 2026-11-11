@@ -82,6 +82,18 @@ jobs:
           esac
           ./gradlew $tasks --no-daemon --stacktrace
 
+      - name: Run the unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Upload the test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitdroid-test-report
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload the debug APK
         if: always() && hashFiles('app/build/outputs/apk/debug/*.apk') != ''
         uses: actions/upload-artifact@v4

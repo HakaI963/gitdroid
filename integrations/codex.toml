@@ -1,0 +1,12 @@
+# ~/.codex/config.toml
+#
+# GitDroid exposes a Model Context Protocol endpoint on the phone. Forward the
+# port over USB first:
+#
+#     adb reverse tcp:8787 tcp:8787
+#
+# The bearer token is shown on the MCP tab of the app.
+
+[mcp_servers.gitdroid]
+url = "http://127.0.0.1:8787/mcp"
+http_headers = { "Authorization" = "Bearer REPLACE_WITH_YOUR_TOKEN" }
