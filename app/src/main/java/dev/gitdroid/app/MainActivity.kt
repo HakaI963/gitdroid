@@ -5,11 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import dev.gitdroid.app.ui.GitDroidApp as GitDroidRoot
 import dev.gitdroid.app.ui.theme.GitDroidTheme
-import dev.gitdroid.app.ui.theme.ThemeMode
 
 /**
  * The single activity.
@@ -25,11 +27,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val container = (application as GitDroidApp).container
+        var themeMode by mutableStateOf(container.settings.themeMode)
 
         setContent {
-            GitDroidTheme(themeMode = ThemeMode.SYSTEM) {
+            GitDroidTheme(themeMode = themeMode) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    GitDroidRoot(container = container)
+                    GitDroidRoot(
+                        container = container,
+                        themeMode = themeMode,
+                        onThemeModeChange = { mode ->
+                            themeMode = mode
+                            container.settings.themeMode = mode
+                        },
+                    )
                 }
             }
         }

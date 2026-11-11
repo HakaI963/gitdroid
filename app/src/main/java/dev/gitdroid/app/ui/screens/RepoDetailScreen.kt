@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Refresh
@@ -38,7 +39,11 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -76,6 +81,7 @@ enum class RepoTab(val label: String) {
     PULLS("Pulls"),
     ACTIONS("Actions"),
     RELEASES("Releases"),
+    SETTINGS("Settings"),
 }
 
 /**
@@ -85,6 +91,7 @@ enum class RepoTab(val label: String) {
  * request list and the Actions runs. The tab strip stays put and the content
  * cross-fades, so switching tabs never feels like loading a page.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RepoDetailScreen(
     repository: GitRepository,
@@ -105,6 +112,7 @@ fun RepoDetailScreen(
     var tab by remember { mutableIntStateOf(0) }
     var branches by remember { mutableStateOf<List<BranchInfo>>(emptyList()) }
     var branchSheet by remember { mutableStateOf(false) }
+    var settingsOpen by remember { mutableStateOf(false) }
 
     val currentBranch = repository.branchFor(repo)
 
@@ -264,8 +272,130 @@ fun RepoDetailScreen(
                     repository = repository,
                     repo = repo,
                 )
+
+                RepoTab.SETTINGS -> RepoSettingsTab(
+                    repository = repository,
+                    repo = repo,
+                    onOpenSettings = { settingsOpen = true },
+                )
             }
         }
+    }
+
+    if (settingsOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { settingsOpen = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            RepoSettingsSheet(
+                repository = repository,
+                repo = repo,
+                onClose = { settingsOpen = false },
+                onDeleted = {
+                    settingsOpen = false
+                    onBack()
+                },
+            )
+        }
+    }
+}
+
+/** The settings tab — a summary plus the full editor. */
+@Composable
+private fun RepoSettingsTab(
+    repository: GitRepository,
+    repo: Repository,
+    onOpenSettings: () -> Unit,
+) {
+    val space = LocalSpace.current
+    val type = LocalType.current
+    val colors = LocalGitDroidColors.current
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = space.gutter,
+            end = space.gutter,
+            bottom = space.xxxl,
+        ),
+        verticalArrangement = Arrangement.spacedBy(space.rowGap),
+    ) {
+        item(key = "summary") {
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Column(Modifier.padding(space.md)) {
+                    InfoRow("Default branch", repo.defaultBranch)
+                    InfoRow("Visibility", if (repo.isPrivate) "Private" else "Public")
+                    InfoRow("Language", repo.language ?: "—")
+                    InfoRow("Stars", repo.stargazersCount.toString())
+                    InfoRow("Forks", repo.forksCount.toString())
+                    InfoRow("Open issues", repo.openIssuesCount.toString())
+                    InfoRow("Updated", repo.updatedAt?.take(10) ?: "—")
+                }
+            }
+        }
+
+        item(key = "topics") {
+            if (repo.topics.isNotEmpty()) {
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Column(Modifier.padding(space.md)) {
+                        Text(
+                            text = "Topics",
+                            style = type.labelSmall,
+                            color = colors.textTertiary,
+                        )
+                        Spacer(Modifier.height(space.sm))
+                        Row(horizontalArrangement = Arrangement.spacedBy(space.xs)) {
+                            repo.topics.take(4).forEach { topic ->
+                                MetaPill(text = topic, color = MaterialTheme.colorScheme.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        item(key = "edit") {
+            OutlinedButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(space.sm))
+                Text("Edit repository settings", style = type.label)
+            }
+        }
+    }
+}
+
+/** A label and a value, in a row. */
+@Composable
+private fun InfoRow(label: String, value: String) {
+    val space = LocalSpace.current
+    val type = LocalType.current
+    val colors = LocalGitDroidColors.current
+
+    Row(
+        modifier = Modifier.padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = type.bodySmall,
+            color = colors.textTertiary,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            style = type.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

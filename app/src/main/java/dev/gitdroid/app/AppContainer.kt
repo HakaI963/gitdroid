@@ -33,6 +33,8 @@ class AppContainer(context: Context) {
 
     val diskCache = DiskCache(appContext)
 
+    val settings = dev.gitdroid.app.core.Settings(appContext)
+
     val api = GitHubApi(tokenProvider = { secureStore.githubToken })
 
     val authManager = AuthManager(

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -17,6 +18,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,8 +39,10 @@ import dev.gitdroid.app.ui.screens.RepoDetailScreen
 import dev.gitdroid.app.ui.screens.ReposScreen
 import dev.gitdroid.app.ui.screens.CreateRepoSheet
 import dev.gitdroid.app.ui.screens.SearchScreen
+import dev.gitdroid.app.ui.screens.SettingsScreen
 import dev.gitdroid.app.ui.screens.collectAsStateCompat
 import dev.gitdroid.app.ui.theme.LocalGitDroidColors
+import dev.gitdroid.app.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
 import dev.gitdroid.app.ui.theme.LocalSpace
 import dev.gitdroid.app.ui.theme.LocalType
@@ -48,6 +52,7 @@ enum class TopLevelDestination(val label: String) {
     REPOS("Repos"),
     SEARCH("Search"),
     MCP("MCP"),
+    SETTINGS("You"),
 }
 
 /**
@@ -61,7 +66,11 @@ enum class TopLevelDestination(val label: String) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GitDroidApp(container: AppContainer) {
+fun GitDroidApp(
+    container: AppContainer,
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
+) {
     val space = LocalSpace.current
     val type = LocalType.current
     val colors = LocalGitDroidColors.current
@@ -76,8 +85,14 @@ fun GitDroidApp(container: AppContainer) {
     var issueNumber by remember { mutableStateOf<Int?>(null) }
     var showBack by remember { mutableStateOf(false) }
     var createRepoOpen by remember { mutableStateOf(false) }
+    var cacheSize by remember { mutableStateOf(0L) }
 
     val downloader = remember { Downloader(context, container.api) }
+
+    // Restore the saved theme and measure the cache once, off the hot path.
+    LaunchedEffect(Unit) {
+        cacheSize = container.diskCache.sizeBytes()
+    }
 
     when (val current = session) {
         SessionState.Loading -> Box(Modifier.fillMaxSize())
@@ -108,6 +123,7 @@ fun GitDroidApp(container: AppContainer) {
                                             TopLevelDestination.REPOS -> Icons.Rounded.Hub
                                             TopLevelDestination.SEARCH -> Icons.Rounded.Search
                                             TopLevelDestination.MCP -> Icons.Rounded.Info
+                                            TopLevelDestination.SETTINGS -> Icons.Rounded.Person
                                         },
                                         contentDescription = null,
                                     )
@@ -182,6 +198,21 @@ fun GitDroidApp(container: AppContainer) {
                             showBack = true
                         },
                         onBack = { destination = TopLevelDestination.REPOS },
+                    )
+
+                    destination == TopLevelDestination.SETTINGS -> SettingsScreen(
+                        session = current,
+                        themeMode = themeMode,
+                        onThemeModeChange = onThemeModeChange,
+                        cacheSizeBytes = cacheSize,
+                        onClearCache = {
+                            container.scope.launch {
+                                container.diskCache.clear()
+                                cacheSize = container.diskCache.sizeBytes()
+                            }
+                        },
+                        onSignOut = { container.authManager.signOut() },
+                        onOpenMcp = { destination = TopLevelDestination.MCP },
                     )
 
                     destination == TopLevelDestination.MCP -> McpScreen(
