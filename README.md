@@ -11,9 +11,13 @@ can drive the GitHub account that is signed in on the phone.
   <em>Repositories · code · issues · pull requests · Actions · releases · search · downloads · an MCP server for your agents</em>
 </p>
 
-| Repositories | The MCP dashboard |
+| Inbox & repositories | The MCP dashboard |
 |---|---|
-| ![Repositories](docs/screenshots/07-shell-dark.png) | ![MCP](docs/screenshots/03-mcp-dark.png) |
+| ![Shell](docs/screenshots/07-shell-dark.png) | ![MCP](docs/screenshots/03-mcp-dark.png) |
+
+| Repository detail | The repository header |
+|---|---|
+| ![Repo](docs/screenshots/10-repo-detail.png) | ![Overview](docs/screenshots/09-repo-overview.png) |
 
 ---
 
@@ -206,7 +210,7 @@ The requested scope is `repo workflow read:org`.
 
 ## Screens
 
-| Issues | Actions |
+| Issue detail | Actions |
 |---|---|
 | ![Issues](docs/screenshots/05-issues-dark.png) | ![Actions](docs/screenshots/06-actions-dark.png) |
 
