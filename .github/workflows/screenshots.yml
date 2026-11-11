@@ -9,7 +9,7 @@ on:
   push:
     paths:
       - 'app/src/main/java/dev/gitdroid/app/ui/**'
-      - 'app/src/screenshotTest/**'
+      - 'app/src/test/java/dev/gitdroid/app/screenshot/**'
       - 'app/build.gradle.kts'
       - 'gradle/libs.versions.toml'
 
@@ -55,20 +55,15 @@ jobs:
 
       - name: Render the screens
         run: |
-          ./gradlew :app:updateDebugScreenshotTest --no-daemon --stacktrace --rerun-tasks -i 2>&1 \
-            | grep -iE "preview|layoutlib|screenshot|roborazzi|discover" | head -60
+          ./gradlew :app:testDebugUnitTest --tests '*ScreenshotTest*' --no-daemon --stacktrace
           echo "--- rendered images ---"
-          find app/build -name "*.png" 2>/dev/null | head -40
-          echo "--- report ---"
-          find app/build/reports -type f 2>/dev/null | head -20
+          find app/build/screenshots -name '*.png' 2>/dev/null | sort
 
       - name: Upload the screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gitdroid-screenshots
-          path: |
-            app/build/outputs/screenshotTest-results/
-            app/build/reports/
+          path: app/build/screenshots/
           if-no-files-found: warn
           retention-days: 14

@@ -7,27 +7,60 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import dev.gitdroid.app.ui.components.RepoRow
 import dev.gitdroid.app.ui.preview.SampleRepos
 import dev.gitdroid.app.ui.screens.McpScreen
 import dev.gitdroid.app.ui.theme.GitDroidTheme
 import dev.gitdroid.app.ui.theme.ThemeMode
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 /**
- * The screens the design review renders.
+ * Renders the app's screens to PNGs so the design can be reviewed without a
+ * device.
  *
- * Every preview here is rendered on the JVM by
- * `./gradlew :app:updateDebugScreenshotTest` and lands in
- * `app/build/outputs/roborazzi/`.
+ * Robolectric draws the real Compose UI on the JVM, so these are the actual
+ * pixels the app produces — not a mock-up.
+ *
+ * The images land in `app/build/screenshots/`.
  */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w411dp-h891dp-xhdpi")
+class ScreenshotTest {
 
-@Preview(name = "01-repos-dark", showBackground = true, heightDp = 700)
-@Composable
-fun ReposDark() {
-    GitDroidTheme(themeMode = ThemeMode.DARK) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+    @get:Rule
+    val compose = createComposeRule()
+
+    private fun capture(name: String, themeMode: ThemeMode, content: @Composable () -> Unit) {
+        compose.setContent {
+            GitDroidTheme(themeMode = themeMode) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    content()
+                }
+            }
+        }
+        compose.waitForIdle()
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        val dir = File("build/screenshots").apply { mkdirs() }
+        File(dir, "$name.png").outputStream().use { out ->
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+        }
+    }
+
+    @Test
+    fun reposDark() {
+        capture("01-repos-dark", ThemeMode.DARK) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -38,13 +71,10 @@ fun ReposDark() {
             }
         }
     }
-}
 
-@Preview(name = "02-repos-light", showBackground = true, heightDp = 700)
-@Composable
-fun ReposLight() {
-    GitDroidTheme(themeMode = ThemeMode.LIGHT) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+    @Test
+    fun reposLight() {
+        capture("02-repos-light", ThemeMode.LIGHT) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -55,13 +85,10 @@ fun ReposLight() {
             }
         }
     }
-}
 
-@Preview(name = "03-mcp-dark", showBackground = true, heightDp = 900)
-@Composable
-fun McpDark() {
-    GitDroidTheme(themeMode = ThemeMode.DARK) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+    @Test
+    fun mcpDark() {
+        capture("03-mcp-dark", ThemeMode.DARK) {
             McpScreen(
                 port = 8787,
                 running = true,
@@ -74,13 +101,10 @@ fun McpDark() {
             )
         }
     }
-}
 
-@Preview(name = "04-mcp-light", showBackground = true, heightDp = 900)
-@Composable
-fun McpLight() {
-    GitDroidTheme(themeMode = ThemeMode.LIGHT) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+    @Test
+    fun mcpLight() {
+        capture("04-mcp-light", ThemeMode.LIGHT) {
             McpScreen(
                 port = 8787,
                 running = false,

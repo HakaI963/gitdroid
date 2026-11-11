@@ -5,7 +5,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.compose.screenshot)
 }
 
 // Release signing is optional: when key.properties is absent the release build falls back to
@@ -74,8 +73,6 @@ android {
         buildConfig = true
     }
 
-    experimentalProperties["android.experimental.enableScreenshotTest"] = true
-
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -87,6 +84,15 @@ android {
     lint {
         abortOnError = false
         checkReleaseBuilds = false
+    }
+
+    testOptions {
+        unitTests {
+            // Robolectric needs the merged resources and assets to render
+            // the real Compose UI.
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
     }
 }
 
@@ -122,9 +128,8 @@ dependencies {
 
     // Screenshot tests render the real Compose UI on the JVM through
     // Robolectric, so the design can be reviewed without a device.
-    screenshotTestImplementation(libs.junit)
-    screenshotTestImplementation(libs.robolectric)
-    screenshotTestImplementation(libs.androidx.test.core)
-    screenshotTestImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
