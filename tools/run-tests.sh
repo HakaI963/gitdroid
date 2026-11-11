@@ -9,10 +9,9 @@ set -uo pipefail
 OUT=/tmp/opencode/tc-out
 CACHE=${APICACHE:-/tmp/opencode/apicache}
 
-if [ ! -d "$OUT" ]; then
-  echo "no compiled classes — run tools/typecheck.sh first" >&2
-  exit 2
-fi
+# Always compile first: running against stale classes silently tests the
+# previous version of the source, which is worse than not running at all.
+"$(dirname "$0")/typecheck.sh" | grep -E "error:" && { echo "compile failed" >&2; exit 1; }
 
 CP="$OUT"
 CP="$CP:/tmp/opencode/rtcheck/kotlin-stdlib.jar"

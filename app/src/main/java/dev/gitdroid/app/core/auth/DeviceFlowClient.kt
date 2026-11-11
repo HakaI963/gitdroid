@@ -122,7 +122,23 @@ class DeviceFlowClient(
             val json = executeJson(request)
             val error = json.string("error")
             when {
-                error == null || error == "authorization_pending" -> {
+                // No `error` field means GitHub sent the token. This has to
+                // be checked before the pending branch, or a successful
+                // sign-in is mistaken for "keep waiting" and the code
+                // eventually expires while the user watches a spinner.
+                error == null -> {
+                    val token = json.string("access_token")
+                        ?: throw GitHubException(0, "GitHub sent no access token")
+                    return@withContext TokenResult(
+                        accessToken = token,
+                        refreshToken = json.string("refresh_token"),
+                        tokenType = json.string("token_type").orEmpty(),
+                        scope = json.string("scope").orEmpty(),
+                        expiresInSeconds = json.int("expires_in") ?: 0,
+                    )
+                }
+
+                error == "authorization_pending" -> {
                     delay(deviceCode.intervalSeconds * 1000L)
                 }
 

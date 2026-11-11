@@ -79,6 +79,17 @@ class GitRepository(
     private val _branchSelection = MutableStateFlow<Map<String, String>>(emptyMap())
     val branchSelection: StateFlow<Map<String, String>> = _branchSelection.asStateFlow()
 
+    /**
+     * Puts [repos] straight into the list without touching the network.
+     *
+     * Only the screenshot tests and previews need this: they render the shell
+     * with content, which an empty cache cannot show.
+     */
+    fun seedForPreview(repos: List<Repository>) {
+        _repos.value = repos
+        _reposLoading.value = false
+    }
+
     /** Loads the cached repo list immediately, then refreshes in the background. */
     fun loadRepos() {
         scope.launch {
