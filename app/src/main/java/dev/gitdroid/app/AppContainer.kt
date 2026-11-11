@@ -1,0 +1,110 @@
+package dev.gitdroid.app
+
+import android.content.Context
+import dev.gitdroid.app.core.api.GitHubApi
+import dev.gitdroid.app.core.auth.AuthManager
+import dev.gitdroid.app.core.auth.SecureStore
+import dev.gitdroid.app.core.cache.DiskCache
+import dev.gitdroid.app.core.repo.GitRepository
+import dev.gitdroid.app.mcp.McpServer
+import dev.gitdroid.app.mcp.McpService
+import dev.gitdroid.app.mcp.McpTools
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+/**
+ * The application's object graph.
+ *
+ * Manual dependency injection: the graph is small, and a plain container keeps
+ * the build free of annotation processors, which keeps CI fast.
+ */
+class AppContainer(context: Context) {
+
+    private val appContext = context.applicationContext
+
+    /** A scope that lives as long as the process. */
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    val secureStore = SecureStore(appContext)
+
+    val diskCache = DiskCache(appContext)
+
+    val api = GitHubApi(tokenProvider = { secureStore.githubToken })
+
+    val authManager = AuthManager(
+        context = appContext,
+        store = secureStore,
+        apiProvider = { api },
+    )
+
+    val repository = GitRepository(
+        api = api,
+        cache = diskCache,
+        scope = scope,
+    )
+
+    private val mcpTools = McpTools(api)
+
+    private var mcpServer: McpServer? = null
+
+    private val _mcpPort = MutableStateFlow(McpServer.DEFAULT_PORT)
+    val mcpPort: StateFlow<Int> = _mcpPort.asStateFlow()
+
+    private val _mcpRunning = MutableStateFlow(false)
+    val mcpRunning: StateFlow<Boolean> = _mcpRunning.asStateFlow()
+
+    /** Starts the MCP server and the foreground service that keeps it alive. */
+    fun startMcpServer() {
+        if (mcpServer?.isRunning == true) return
+        val server = McpServer(
+            tools = mcpTools,
+            scope = scope,
+            bearerToken = { secureStore.mcpToken },
+        )
+        val port = runCatching { server.start() }.getOrElse {
+            _mcpRunning.value = false
+            return
+        }
+        mcpServer = server
+        _mcpPort.value = port
+        _mcpRunning.value = true
+    }
+
+    /** Stops the MCP server. */
+    fun stopMcpServer() {
+        mcpServer?.stop()
+        mcpServer = null
+        _mcpRunning.value = false
+    }
+
+    /** The bearer token an agent must send, generating one on first use. */
+    fun mcpToken(): String {
+        val existing = secureStore.mcpToken
+        if (!existing.isNullOrBlank()) return existing
+        val generated = SecureStore.randomToken()
+        secureStore.mcpToken = generated
+        return generated
+    }
+
+    /** The LAN address an agent on the same network can reach. */
+    fun lanAddress(): String {
+        val addresses = runCatching {
+            java.net.NetworkInterface.getNetworkInterfaces().toList()
+                .asSequence()
+                .filter { it.isUp && !it.isLoopback }
+                .flatMap { it.inetAddresses.toList().asSequence() }
+                .map { it.hostAddress }
+                .filterNot { it.contains(':') }
+                .toList()
+        }.getOrDefault(emptyList())
+        return addresses.firstOrNull() ?: "127.0.0.1"
+    }
+}
+
+/** The [AppContainer] of the running process. */
+val Context.container: AppContainer
+    get() = (applicationContext as GitDroidApp).container

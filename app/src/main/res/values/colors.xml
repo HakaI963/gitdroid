@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="gitdroid_window_background">#FF12141A</color>
+    <color name="gitdroid_launcher_background">#FF12141A</color>
+</resources>
