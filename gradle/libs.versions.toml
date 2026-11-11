@@ -16,6 +16,7 @@ coil = "2.7.0"
 zxing = "3.5.3"
 junit = "4.13.2"
 robolectric = "4.14.1"
+roborazzi = "1.78.0"
 androidxTest = "1.6.1"
 androidxTestExt = "1.2.1"
 androidxTestCore = "1.6.1"
@@ -55,6 +56,8 @@ androidx-test-core = { group = "androidx.test", name = "core", version.ref = "an
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExt" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

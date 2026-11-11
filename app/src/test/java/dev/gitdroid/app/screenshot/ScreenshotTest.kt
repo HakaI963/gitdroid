@@ -7,11 +7,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.gitdroid.app.ui.components.RepoRow
 import dev.gitdroid.app.ui.preview.SampleRepos
 import dev.gitdroid.app.ui.screens.McpScreen
@@ -19,18 +18,17 @@ import dev.gitdroid.app.ui.theme.GitDroidTheme
 import dev.gitdroid.app.ui.theme.ThemeMode
 import org.junit.Rule
 import org.junit.Test
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.runner.RunWith
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.File
 
 /**
  * Renders the app's screens to PNGs so the design can be reviewed without a
  * device.
  *
- * Robolectric draws the real Compose UI on the JVM, so these are the actual
- * pixels the app produces — not a mock-up.
+ * These are the actual pixels the app produces — Roborazzi drives the real
+ * Compose UI on the JVM through Robolectric.
  *
  * The images land in `app/build/screenshots/`.
  */
@@ -50,30 +48,7 @@ class ScreenshotTest {
                 }
             }
         }
-        // Robolectric does not run the frame clock the way a device does, so
-        // the clock is driven by hand instead of waiting for idle.
-        compose.mainClock.advanceTimeBy(600)
-        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
-        val dir = File("build/screenshots").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { out ->
-            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-        }
-    }
-
-    /** A sanity check: if even a `Text` cannot be captured, the harness is broken. */
-    @Test
-    fun harnessWorks() {
-        compose.setContent {
-            GitDroidTheme(themeMode = ThemeMode.DARK) {
-                androidx.compose.material3.Text("GitDroid")
-            }
-        }
-        compose.mainClock.advanceTimeBy(200)
-        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
-        val dir = File("build/screenshots").apply { mkdirs() }
-        File(dir, "00-harness.png").outputStream().use { out ->
-            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-        }
+        compose.onRoot().captureRoboImage("build/screenshots/$name.png")
     }
 
     @Test
