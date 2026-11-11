@@ -124,6 +124,7 @@ fun RepoDetailScreen(
             repo = repo,
             branch = currentBranch,
             onRequestBranchSheet = { branchSheet = true },
+            onBack = onBack,
         )
 
         // ── Tabs ────────────────────────────────────────────────────────
