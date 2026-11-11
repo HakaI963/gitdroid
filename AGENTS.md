@@ -37,7 +37,7 @@ build-tools 36.0.0):
 ## Fast feedback
 
 `tools/typecheck.sh` type-checks the Kotlin sources against the same
-dependency versions CI uses, in seconds instead of minutes. `tools/rt.sh`
+dependency versions CI uses, in seconds instead of minutes. `tools/run-tests.sh`
 runs the unit tests locally. `tools/clean_imports.py` removes unused imports
 (it keeps the operator imports that property delegation needs).
 
