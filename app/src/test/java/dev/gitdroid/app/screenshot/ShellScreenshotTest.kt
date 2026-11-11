@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Cable
+import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +42,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.gitdroid.app.AppContainer
+import dev.gitdroid.app.ui.ShellTabBar
 import dev.gitdroid.app.ui.components.PageBackground
 import dev.gitdroid.app.ui.preview.SampleRepos
 import dev.gitdroid.app.ui.screens.ReposScreen
@@ -90,20 +92,15 @@ class ShellScreenshotTest {
     fun shellLight() = shell("08-shell-light", ThemeMode.LIGHT)
 }
 
-/** The tabs the shell shows. */
-enum class ShellTab(val label: String) {
-    REPOS("Repos"),
-    SEARCH("Search"),
-    MCP("MCP"),
-    SETTINGS("You"),
-}
+/** The shell under test uses the app's own destination enum. */
+private typealias Tab = dev.gitdroid.app.ui.TopLevelDestination
 
 /** The shell, parameterised by the container so the preview can seed data. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ShellAt(container: AppContainer, themeMode: ThemeMode) {
     val type = LocalType.current
-    var tab by remember { mutableStateOf(ShellTab.REPOS) }
+    var tab by remember { mutableStateOf(Tab.INBOX) }
 
     GitDroidTheme(themeMode = themeMode) {
         Scaffold(
@@ -138,29 +135,7 @@ private fun ShellAt(container: AppContainer, themeMode: ThemeMode) {
                 )
             },
             bottomBar = {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    tonalElevation = 0.dp,
-                ) {
-                    ShellTab.entries.forEach { entry ->
-                        NavigationBarItem(
-                            selected = tab == entry,
-                            onClick = { tab = entry },
-                            icon = {
-                                Icon(
-                                    imageVector = when (entry) {
-                                        ShellTab.REPOS -> Icons.Rounded.Hub
-                                        ShellTab.SEARCH -> Icons.Rounded.Search
-                                        ShellTab.MCP -> Icons.Rounded.Cable
-                                        ShellTab.SETTINGS -> Icons.Rounded.Person
-                                    },
-                                    contentDescription = null,
-                                )
-                            },
-                            label = { Text(entry.label, style = type.labelSmall) },
-                        )
-                    }
-                }
+                ShellTabBar(selected = tab, onSelect = { tab = it })
             },
             containerColor = Color.Transparent,
         ) { innerPadding ->

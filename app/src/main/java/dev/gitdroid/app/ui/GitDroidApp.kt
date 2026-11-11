@@ -153,36 +153,16 @@ fun GitDroidApp(
                 }
             },
             bottomBar = {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    tonalElevation = 0.dp,
-                ) {
-                    TopLevelDestination.entries.forEach { entry ->
-                        NavigationBarItem(
-                            selected = destination == entry,
-                            onClick = {
-                                destination = entry
-                                repo = null
-                                filePath = null
-                                issueNumber = null
-                                runId = null
-                            },
-                            icon = {
-                                Icon(
-                                    imageVector = when (entry) {
-                                        TopLevelDestination.INBOX -> Icons.Rounded.Inbox
-                                        TopLevelDestination.REPOS -> Icons.Rounded.Hub
-                                        TopLevelDestination.SEARCH -> Icons.Rounded.Search
-                                        TopLevelDestination.MCP -> Icons.Rounded.Cable
-                                        TopLevelDestination.SETTINGS -> Icons.Rounded.Person
-                                    },
-                                    contentDescription = null,
-                                )
-                            },
-                            label = { Text(entry.label, style = type.labelSmall) },
-                        )
-                    }
-                }
+                ShellTabBar(
+                    selected = destination,
+                    onSelect = {
+                        destination = it
+                        repo = null
+                        filePath = null
+                        issueNumber = null
+                        runId = null
+                    },
+                )
             },
             snackbarHost = { SnackbarHost(snackbar) },
             containerColor = Color.Transparent,
@@ -379,4 +359,43 @@ private fun ShellHeader(login: String, syncing: Boolean, onOpenAccount: () -> Un
             titleContentColor = MaterialTheme.colorScheme.onSurface,
         ),
     )
+}
+
+/**
+ * The bottom tab bar.
+ *
+ * Extracted because the screenshot test renders the shell: with the bar
+ * duplicated there, adding a tab would silently change the app but not the
+ * picture anyone reviews.
+ */
+@Composable
+fun ShellTabBar(
+    selected: TopLevelDestination,
+    onSelect: (TopLevelDestination) -> Unit,
+) {
+    val type = LocalType.current
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 0.dp,
+    ) {
+        TopLevelDestination.entries.forEach { entry ->
+            NavigationBarItem(
+                selected = selected == entry,
+                onClick = { onSelect(entry) },
+                icon = {
+                    Icon(
+                        imageVector = when (entry) {
+                            TopLevelDestination.INBOX -> Icons.Rounded.Inbox
+                            TopLevelDestination.REPOS -> Icons.Rounded.Hub
+                            TopLevelDestination.SEARCH -> Icons.Rounded.Search
+                            TopLevelDestination.MCP -> Icons.Rounded.Cable
+                            TopLevelDestination.SETTINGS -> Icons.Rounded.Person
+                        },
+                        contentDescription = null,
+                    )
+                },
+                label = { Text(entry.label, style = type.labelSmall) },
+            )
+        }
+    }
 }
