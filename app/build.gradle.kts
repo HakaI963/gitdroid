@@ -94,6 +94,14 @@ android {
             isReturnDefaultValues = true
         }
     }
+
+    // Roborazzi renders the real Compose UI on the JVM and writes the PNGs;
+    // without record mode it would silently write nothing.
+    tasks.withType<Test>().configureEach {
+        systemProperty("robolectric.pixelCopyRenderMode", "hardware")
+        systemProperty("roborazzi.test.record", "true")
+        systemProperty("roborazzi.record.filePathStrategy", "relativePathFromRoborazziContextOutputDirectory")
+    }
 }
 
 dependencies {
