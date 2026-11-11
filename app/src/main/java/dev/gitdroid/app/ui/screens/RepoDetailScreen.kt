@@ -22,18 +22,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.CallSplit
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -57,7 +55,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.gitdroid.app.core.api.Repository
-import dev.gitdroid.app.core.api.WorkflowRun
 import dev.gitdroid.app.core.repo.BranchInfo
 import dev.gitdroid.app.core.repo.GitRepository
 import dev.gitdroid.app.ui.components.EmptyState
@@ -67,7 +64,6 @@ import dev.gitdroid.app.ui.theme.LocalGitDroidColors
 import dev.gitdroid.app.ui.theme.LocalMotion
 import dev.gitdroid.app.ui.theme.LocalSpace
 import dev.gitdroid.app.ui.theme.LocalType
-import kotlinx.coroutines.launch
 
 /** The tabs of a repository. */
 enum class RepoTab(val label: String) {
@@ -110,6 +106,9 @@ fun RepoDetailScreen(
     var branches by remember { mutableStateOf<List<BranchInfo>>(emptyList()) }
     var branchSheet by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var createIssueOpen by remember { mutableStateOf(false) }
+    var createPullOpen by remember { mutableStateOf(false) }
+    var cloneOpen by remember { mutableStateOf(false) }
 
     val currentBranch = repository.branchFor(repo)
 
@@ -146,6 +145,24 @@ fun RepoDetailScreen(
                         )
                     },
                 )
+            }
+        }
+
+        // ── Actions available from anywhere in the repository ───────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = space.gutter, vertical = space.xs),
+            horizontalArrangement = Arrangement.spacedBy(space.sm),
+        ) {
+            RepoAction(label = "New issue", icon = Icons.Rounded.ErrorOutline, modifier = Modifier.weight(1f)) {
+                createIssueOpen = true
+            }
+            RepoAction(label = "New pull", icon = Icons.Rounded.CallSplit, modifier = Modifier.weight(1f)) {
+                createPullOpen = true
+            }
+            RepoAction(label = "Clone", icon = Icons.Rounded.ContentPaste, modifier = Modifier.weight(1f)) {
+                cloneOpen = true
             }
         }
 
@@ -211,6 +228,51 @@ fun RepoDetailScreen(
             },
             onDismiss = { branchSheet = false },
         )
+    }
+
+    if (createIssueOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { createIssueOpen = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            CreateIssueSheet(
+                repository = repository,
+                repo = repo,
+                onCreated = { number ->
+                    createIssueOpen = false
+                    onOpenIssue(number)
+                },
+            )
+        }
+    }
+
+    if (createPullOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { createPullOpen = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            CreatePullSheet(
+                repository = repository,
+                repo = repo,
+                currentBranch = currentBranch,
+                onCreated = { number ->
+                    createPullOpen = false
+                    onOpenPull(number)
+                },
+            )
+        }
+    }
+
+    if (cloneOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { cloneOpen = false },
+            sheetState = rememberModalBottomSheetState(),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            CloneSheet(repo = repo)
+        }
     }
 
     if (settingsOpen) {
@@ -603,4 +665,41 @@ fun formatBytes(bytes: Long): String = when {
     bytes < 1024 * 1024 -> "${bytes / 1024} KB"
     bytes < 1024L * 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
     else -> String.format("%.1f GB", bytes / (1024.0 * 1024.0 * 1024.0))
+}
+
+/** A compact action chip in the repository bar. */
+@Composable
+private fun RepoAction(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val space = LocalSpace.current
+    val type = LocalType.current
+    val colors = LocalGitDroidColors.current
+
+    Row(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f))
+            .clickable(onClick = onClick)
+            .padding(vertical = space.sm, horizontal = space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(14.dp),
+            tint = colors.textTertiary,
+        )
+        Spacer(Modifier.width(space.xs))
+        Text(
+            text = label,
+            style = type.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+    }
 }
