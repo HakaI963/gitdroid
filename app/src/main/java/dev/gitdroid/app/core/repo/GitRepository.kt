@@ -17,6 +17,7 @@ import dev.gitdroid.app.core.api.UpdateIssueRequest
 import dev.gitdroid.app.core.api.UpdateRepoRequest
 import dev.gitdroid.app.core.api.User
 import dev.gitdroid.app.core.api.Workflow
+import dev.gitdroid.app.core.api.WorkflowJob
 import dev.gitdroid.app.core.api.WorkflowRun
 import dev.gitdroid.app.core.api.WorkflowDispatchRequest
 import dev.gitdroid.app.core.cache.DiskCache
@@ -385,6 +386,10 @@ class GitRepository(
     /** Loads one workflow run with its jobs. */
     suspend fun workflowRun(owner: String, repo: String, runId: Long): WorkflowRun? =
         runCatching { api.workflowRun(owner, repo, runId) }.getOrNull()
+
+    /** Loads the jobs of a workflow run, with their steps. */
+    suspend fun workflowRunJobs(owner: String, repo: String, runId: Long): List<WorkflowJob> =
+        runCatching { api.workflowRunJobs(owner, repo, runId) }.getOrElse { emptyList() }
 
     /** Re-runs a workflow run. */
     suspend fun rerunRun(owner: String, repo: String, runId: Long): Result<Unit> =

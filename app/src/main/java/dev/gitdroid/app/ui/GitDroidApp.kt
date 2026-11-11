@@ -38,6 +38,7 @@ import dev.gitdroid.app.ui.screens.IssueScreen
 import dev.gitdroid.app.ui.screens.McpScreen
 import dev.gitdroid.app.ui.screens.RepoDetailScreen
 import dev.gitdroid.app.ui.screens.ReposScreen
+import dev.gitdroid.app.ui.screens.RunScreen
 import dev.gitdroid.app.ui.screens.CreateRepoSheet
 import dev.gitdroid.app.ui.screens.SearchScreen
 import dev.gitdroid.app.ui.screens.SettingsScreen
@@ -84,6 +85,7 @@ fun GitDroidApp(
     var repo by remember { mutableStateOf<Repository?>(null) }
     var filePath by remember { mutableStateOf<String?>(null) }
     var issueNumber by remember { mutableStateOf<Int?>(null) }
+    var runId by remember { mutableStateOf<Long?>(null) }
     var showBack by remember { mutableStateOf(false) }
     var createRepoOpen by remember { mutableStateOf(false) }
     var cacheSize by remember { mutableStateOf(0L) }
@@ -102,8 +104,9 @@ fun GitDroidApp(
      * tabs — so it is written out explicitly rather than pulled in from a
      * navigation library.
      */
-    BackHandler(enabled = showBack || filePath != null || issueNumber != null) {
+    BackHandler(enabled = showBack || filePath != null || issueNumber != null || runId != null) {
         when {
+            runId != null -> runId = null
             filePath != null -> filePath = null
             issueNumber != null -> issueNumber = null
             repo != null -> {
@@ -163,6 +166,14 @@ fun GitDroidApp(
                     .padding(it),
             ) {
                 when {
+                    runId != null && repo != null -> RunScreen(
+                        repository = container.repository,
+                        owner = repo!!.ownerLogin,
+                        repo = repo!!.name,
+                        runId = runId!!,
+                        onBack = { runId = null },
+                    )
+
                     issueNumber != null && repo != null -> IssueScreen(
                         repository = container.repository,
                         owner = repo!!.ownerLogin,
@@ -196,7 +207,7 @@ fun GitDroidApp(
                         onOpenFile = { path -> filePath = path },
                         onOpenIssue = { number -> issueNumber = number },
                         onOpenPull = { number -> issueNumber = number },
-                        onOpenRun = { },
+                        onOpenRun = { id -> runId = id },
                     )
 
                     destination == TopLevelDestination.REPOS -> ReposScreen(
