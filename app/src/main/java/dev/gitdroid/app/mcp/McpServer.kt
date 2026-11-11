@@ -12,8 +12,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -56,8 +56,11 @@ class McpServer(
     val isRunning: Boolean get() = running.get()
 
     /** Starts the server. Returns the port it is listening on. */
-    fun start(): Int {
+    fun start(port: Int = this.port): Int {
         if (running.getAndSet(true)) return boundPort
+        // The preferred port may already be taken — another instance of the
+        // app, or a leftover socket. The caller decides whether to fall back
+        // to an ephemeral port.
         val socket = ServerSocket(port, 0, InetAddress.getByName("0.0.0.0"))
         serverSocket = socket
         boundPort = socket.localPort
@@ -86,38 +89,31 @@ class McpServer(
     private suspend fun handle(client: Socket) {
         client.use { socket ->
             socket.soTimeout = 30_000
-            val input = BufferedReader(InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8))
+            val input = socket.getInputStream()
             val output = socket.getOutputStream()
 
-            val requestLine = input.readLine() ?: return
+            // The request head has to be read at the *byte* level. A
+            // BufferedReader would happily read past the blank line and
+            // swallow the first bytes of the body, and the body length is a
+            // byte count while the payload is UTF-8 — decoding it as UTF-16
+            // would mangle every non-ASCII character in a commit message.
+            val head = readHead(input) ?: return
+            val requestLine = head.firstLine
             val parts = requestLine.split(' ')
             if (parts.size < 2) return
             val method = parts[0].uppercase()
             val path = parts[1].substringBefore('?')
 
             val headers = mutableMapOf<String, String>()
-            while (true) {
-                val line = input.readLine() ?: break
-                if (line.isEmpty()) break
+            for (line in head.lines.drop(1)) {
+                if (line.isEmpty()) continue
                 val idx = line.indexOf(':')
                 if (idx > 0) {
                     headers[line.substring(0, idx).trim().lowercase()] = line.substring(idx + 1).trim()
                 }
             }
 
-            val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
-            val body = if (contentLength > 0) {
-                val buffer = CharArray(contentLength)
-                var read = 0
-                while (read < contentLength) {
-                    val n = input.read(buffer, read, contentLength - read)
-                    if (n < 0) break
-                    read += n
-                }
-                String(buffer, 0, read)
-            } else {
-                ""
-            }
+            val body = readBody(input, headers)
 
             when {
                 path == "/health" || path == "/healthz" -> {
@@ -173,6 +169,91 @@ class McpServer(
                 }
             }
             output.flush()
+        }
+    }
+
+    /**
+     * Reads the request head — the request line and the headers — up to the
+     * blank line that ends it.
+     *
+     * Returns `null` when the peer closed the connection before sending a
+     * complete head.
+     */
+    private fun readHead(input: InputStream): Head? {
+        val buffer = ByteArrayOutputStream()
+        while (buffer.size() < MAX_HEAD_BYTES) {
+            val byte = input.read()
+            if (byte < 0) return null
+            buffer.write(byte)
+            val text = buffer.toString(StandardCharsets.UTF_8.name())
+            if (text.endsWith("\r\n\r\n") || text.endsWith("\n\n")) break
+        }
+        val text = buffer.toString(StandardCharsets.UTF_8.name())
+        if (text.isBlank()) return null
+        val lines = text.split("\r\n", "\n").filter { it.isNotEmpty() }
+        if (lines.isEmpty()) return null
+        return Head(lines.first(), lines.drop(1))
+    }
+
+    /** The request head, split into its first line and the rest. */
+    private data class Head(val firstLine: String, val lines: List<String>)
+
+    /**
+     * Reads the request body.
+     *
+     * Handles both `Content-Length` and chunked transfer encoding, because
+     * different MCP clients pick different ones.
+     */
+    private fun readBody(input: InputStream, headers: Map<String, String>): String {
+        val chunked = headers["transfer-encoding"]?.contains("chunked", ignoreCase = true) == true
+        if (chunked) {
+            val out = ByteArrayOutputStream()
+            while (true) {
+                val sizeLine = readLine(input) ?: break
+                val size = sizeLine.substringBefore(';').trim().toIntOrNull(16) ?: break
+                if (size == 0) {
+                    readLine(input) // the CRLF of the terminating chunk
+                    break
+                }
+                val chunk = ByteArray(size)
+                var read = 0
+                while (read < size) {
+                    val n = input.read(chunk, read, size - read)
+                    if (n < 0) break
+                    read += n
+                }
+                out.write(chunk, 0, read)
+                readLine(input) // the CRLF after the chunk
+            }
+            return out.toString(StandardCharsets.UTF_8.name())
+        }
+
+        val length = headers["content-length"]?.toIntOrNull() ?: 0
+        if (length <= 0) return ""
+        val buffer = ByteArray(length)
+        var read = 0
+        while (read < length) {
+            val n = input.read(buffer, read, length - read)
+            if (n < 0) break
+            read += n
+        }
+        return String(buffer, 0, read, StandardCharsets.UTF_8)
+    }
+
+    /** Reads one CRLF-terminated line at the byte level. */
+    private fun readLine(input: InputStream): String? {
+        val out = ByteArrayOutputStream()
+        while (true) {
+            val byte = input.read()
+            if (byte < 0) {
+                return if (out.size() == 0) null else out.toString(StandardCharsets.UTF_8.name())
+            }
+            if (byte == NEWLINE) {
+                val text = out.toString(StandardCharsets.UTF_8.name())
+                return if (text.endsWith("\r")) text.dropLast(1) else text
+            }
+            out.write(byte)
+            if (out.size() > MAX_LINE_BYTES) return out.toString(StandardCharsets.UTF_8.name())
         }
     }
 
@@ -534,6 +615,15 @@ class McpServer(
 
     companion object {
         const val DEFAULT_PORT = 8787
+
+        /** A request head larger than this is treated as hostile. */
+        private const val MAX_HEAD_BYTES = 64 * 1024
+
+        /** A single header line larger than this is treated as hostile. */
+        private const val MAX_LINE_BYTES = 16 * 1024
+
+        /** The LF byte, as an Int, so it can be compared with a read byte. */
+        private const val NEWLINE = 10
 
         private val INSTRUCTIONS = """
             GitDroid exposes the GitHub account that is signed in on the phone.

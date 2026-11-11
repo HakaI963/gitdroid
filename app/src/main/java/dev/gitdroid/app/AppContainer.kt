@@ -90,7 +90,12 @@ class AppContainer(context: Context) {
         stopMcpServer()
     }
 
-    /** Starts the MCP server without touching the foreground service. */
+    /**
+     * Starts the MCP server without touching the foreground service.
+     *
+     * If the preferred port is taken, an ephemeral one is used instead — the
+     * app always shows the port it actually ended up on.
+     */
     fun startMcpServer() {
         if (mcpServer?.isRunning == true) return
         val server = McpServer(
@@ -98,10 +103,14 @@ class AppContainer(context: Context) {
             scope = scope,
             bearerToken = { secureStore.mcpToken },
         )
-        val port = runCatching { server.start() }.getOrElse {
-            _mcpRunning.value = false
-            return
-        }
+        val port = runCatching { server.start() }
+            .recoverCatching {
+                server.start(port = 0)
+            }
+            .getOrElse {
+                _mcpRunning.value = false
+                return
+            }
         mcpServer = server
         _mcpPort.value = port
         _mcpRunning.value = true

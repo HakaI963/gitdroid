@@ -48,8 +48,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.ClipEntry
+import android.content.ClipData
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -90,7 +91,7 @@ fun AuthScreen(
     val colors = LocalGitDroidColors.current
     val motion = LocalMotion.current
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
 
     var mode by remember { mutableStateOf(AuthMode.Device) }
     var pat by remember { mutableStateOf("") }
@@ -188,7 +189,7 @@ fun AuthScreen(
                         waiting = waiting,
                         busy = busy,
                         error = error,
-                        onCopy = { deviceCode?.userCode?.let { clipboard.setText(AnnotatedString(it)) } },
+                        onCopy = { deviceCode?.userCode?.let { text -> scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("code", text))) } } },
                         onRefresh = {
                             error = null
                             scope.launch {

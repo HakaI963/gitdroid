@@ -6,11 +6,20 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** Shared JSON codec: GitHub adds fields over time, so unknown keys are ignored. */
+/**
+ * Shared JSON codec: GitHub adds fields over time, so unknown keys are ignored.
+ *
+ * `encodeDefaults` is on because the MCP layer serialises its own types into
+ * the wire format, and a field that happens to equal its default — the
+ * `capabilities` object, a JSON Schema's `type` — still has to be *present*
+ * for a client to understand it. Leaving it out would silently break the
+ * handshake.
+ */
 val GitHubJson: Json = Json {
     ignoreUnknownKeys = true
     coerceInputValues = true
     explicitNulls = false
+    encodeDefaults = true
     isLenient = true
 }
 

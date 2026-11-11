@@ -34,12 +34,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import android.content.ClipData
 import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 import dev.gitdroid.app.ui.components.CodeWell
 import dev.gitdroid.app.ui.components.GlassCard
@@ -71,7 +74,8 @@ fun McpScreen(
     val space = LocalSpace.current
     val type = LocalType.current
     val colors = LocalGitDroidColors.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
 
     var showToken by remember { mutableStateOf(false) }
     var selectedAgent by remember { mutableStateOf(AGENTS.first()) }
@@ -163,14 +167,14 @@ fun McpScreen(
                 UrlCard(
                     title = "On the same network",
                     url = lanUrl,
-                    onCopy = { clipboard.setText(AnnotatedString(lanUrl)) },
+                    onCopy = { scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("url", lanUrl))) } },
                 )
                 Spacer(Modifier.height(space.sm))
                 UrlCard(
                     title = "Over USB (adb reverse)",
                     url = usbUrl,
                     subtitle = "adb reverse tcp:$port tcp:$port",
-                    onCopy = { clipboard.setText(AnnotatedString(usbUrl)) },
+                    onCopy = { scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("url", usbUrl))) } },
                 )
             }
         }
@@ -211,7 +215,7 @@ fun McpScreen(
                             Text(if (showToken) "Hide" else "Show", style = type.label)
                         }
                         OutlinedButton(
-                            onClick = { clipboard.setText(AnnotatedString(bearerToken)) },
+                            onClick = { scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("token", bearerToken))) } },
                             modifier = Modifier.weight(1f),
                         ) {
                             Icon(
@@ -273,9 +277,16 @@ fun McpScreen(
                 Spacer(Modifier.height(space.sm))
                 OutlinedButton(
                     onClick = {
-                        clipboard.setText(
-                            AnnotatedString(selectedAgent.config(lanUrl, bearerToken)),
-                        )
+                        scope.launch {
+                            clipboard.setClipEntry(
+                                ClipEntry(
+                                    ClipData.newPlainText(
+                                        "config",
+                                        selectedAgent.config(lanUrl, bearerToken),
+                                    ),
+                                ),
+                            )
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
