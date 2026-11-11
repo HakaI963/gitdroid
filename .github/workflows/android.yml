@@ -22,11 +22,11 @@ on:
 permissions:
   contents: read
 
-# Only cancel a superseded PR build. A push to main must always produce a
-# verified artifact — cancelling it mid-queue leaves main unverified.
+# Never auto-cancel: a superseded push to main must still finish, or main is
+# left unverified. Interpolating a boolean here reads back as a non-empty
+# string and behaves as true, so it is left out deliberately.
 concurrency:
-  group: apk-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: apk-${{ github.ref }}
 
 env:
   GRADLE_VERSION: 8.13

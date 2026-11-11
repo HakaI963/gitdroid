@@ -16,9 +16,10 @@ on:
 permissions:
   contents: read
 
+# Kept running even when superseded: a cancelled render leaves no artifact to
+# review, which is the whole output of this workflow.
 concurrency:
   group: screenshots-${{ github.ref }}
-  cancel-in-progress: true
 
 env:
   GRADLE_VERSION: 8.13
