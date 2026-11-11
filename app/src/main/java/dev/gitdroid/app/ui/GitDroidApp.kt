@@ -1,12 +1,17 @@
 package dev.gitdroid.app.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Hub
-import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Cable
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -15,6 +20,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -24,7 +31,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +43,7 @@ import dev.gitdroid.app.core.api.Repository
 import dev.gitdroid.app.core.auth.SessionState
 import dev.gitdroid.app.core.download.Downloader
 import dev.gitdroid.app.ui.components.PageBackground
+import dev.gitdroid.app.ui.components.StatusDot
 import dev.gitdroid.app.ui.screens.AuthScreen
 import dev.gitdroid.app.ui.screens.CreateRepoSheet
 import dev.gitdroid.app.ui.screens.FileScreen
@@ -44,6 +55,8 @@ import dev.gitdroid.app.ui.screens.RunScreen
 import dev.gitdroid.app.ui.screens.SearchScreen
 import dev.gitdroid.app.ui.screens.SettingsScreen
 import dev.gitdroid.app.ui.screens.collectAsStateCompat
+import dev.gitdroid.app.ui.theme.LocalGitDroidColors
+import dev.gitdroid.app.ui.theme.LocalType
 import dev.gitdroid.app.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
 
@@ -118,6 +131,14 @@ fun GitDroidApp(
         )
 
         is SessionState.SignedIn -> Scaffold(
+            topBar = {
+                // Detail screens carry their own header, so the app bar only
+                // belongs to the tabs.
+                if (!inDetail) {
+                    val refreshing by container.repository.reposRefreshing.collectAsStateCompat()
+                    ShellHeader(login = current.login, avatarUrl = current.avatarUrl, syncing = refreshing)
+                }
+            },
             bottomBar = {
                 NavigationBar(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -138,7 +159,7 @@ fun GitDroidApp(
                                     imageVector = when (entry) {
                                         TopLevelDestination.REPOS -> Icons.Rounded.Hub
                                         TopLevelDestination.SEARCH -> Icons.Rounded.Search
-                                        TopLevelDestination.MCP -> Icons.Rounded.Info
+                                        TopLevelDestination.MCP -> Icons.Rounded.Cable
                                         TopLevelDestination.SETTINGS -> Icons.Rounded.Person
                                     },
                                     contentDescription = null,
@@ -261,4 +282,61 @@ fun GitDroidApp(
             }
         }
     }
+}
+
+/**
+ * The app bar for the tab screens.
+ *
+ * Compact on purpose: the account name and avatar are the only things that
+ * earn their space here, plus a sync dot so a background refresh is visible
+ * without stealing focus.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ShellHeader(login: String, avatarUrl: String, syncing: Boolean) {
+    val type = LocalType.current
+    val colors = LocalGitDroidColors.current
+
+    TopAppBar(
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "GitDroid",
+                    style = type.title,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (syncing) {
+                    Spacer(Modifier.width(8.dp))
+                    StatusDot(color = MaterialTheme.colorScheme.primary, pulsing = true)
+                }
+            }
+        },
+        actions = {
+            Text(
+                text = login,
+                style = type.labelSmall,
+                color = colors.textTertiary,
+                maxLines = 1,
+                modifier = Modifier.padding(end = 12.dp),
+            )
+            Box(
+                modifier = Modifier
+                    .padding(end = 12.dp)
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = login.take(1).uppercase(),
+                    style = type.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.Transparent,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+    )
 }
