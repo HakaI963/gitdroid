@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Cable
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -20,6 +21,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import dev.gitdroid.app.ui.components.StatusDot
+import dev.gitdroid.app.ui.theme.LocalGitDroidColors
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -94,6 +107,36 @@ private fun ShellAt(container: AppContainer, themeMode: ThemeMode) {
 
     GitDroidTheme(themeMode = themeMode) {
         Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("GitDroid", style = type.title)
+                            Spacer(Modifier.width(8.dp))
+                            StatusDot(color = MaterialTheme.colorScheme.primary)
+                        }
+                    },
+                    actions = {
+                        Text(
+                            text = "HakaI963",
+                            style = type.labelSmall,
+                            color = LocalGitDroidColors.current.textTertiary,
+                            modifier = Modifier.padding(end = 12.dp),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 12.dp)
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("H", style = type.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                )
+            },
             bottomBar = {
                 NavigationBar(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -108,7 +151,7 @@ private fun ShellAt(container: AppContainer, themeMode: ThemeMode) {
                                     imageVector = when (entry) {
                                         ShellTab.REPOS -> Icons.Rounded.Hub
                                         ShellTab.SEARCH -> Icons.Rounded.Search
-                                        ShellTab.MCP -> Icons.Rounded.Info
+                                        ShellTab.MCP -> Icons.Rounded.Cable
                                         ShellTab.SETTINGS -> Icons.Rounded.Person
                                     },
                                     contentDescription = null,
