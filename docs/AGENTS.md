@@ -20,7 +20,8 @@ build-tools 36.0.0):
 ## Fast type-checking
 
 The CI build takes minutes. `tools/typecheck.sh` type-checks the Kotlin
-sources against the exact dependency versions CI uses and finishes in seconds:
+sources against the exact dependency versions CI uses and finishes in seconds
+(it needs the cached jars described in `tools/typecheck.sh`'s header):
 
 ```bash
 ./tools/typecheck.sh
@@ -50,7 +51,8 @@ app/src/main/java/dev/gitdroid/app/
 └── ui/
     ├── theme/              Colour, type, shape and motion tokens
     ├── components/         Shared composables
-    └── screens/            Auth, repos, repo detail, file, search, MCP
+    └── screens/            Auth, inbox, repos, repo detail, code, file,
+                            search, MCP, settings
 ```
 
 ## Rules
@@ -81,7 +83,8 @@ a dependency.
 1. Add the definition in `mcp/McpTools.kt` — a `tool(...)` entry with a
    description the model can act on.
 2. Add the implementation and a `when` branch in `call(...)`.
-3. Bump `toolCount` in `ui/GitDroidApp.kt` so the MCP screen stays honest.
+The advertised count comes from `container.mcpToolCount`, and `McpToolsTest`
+fails if the registry and the dispatcher ever disagree.
 
 The tool names should match the official GitHub MCP server where an
 equivalent exists.

@@ -44,12 +44,22 @@ runs the unit tests locally. `tools/clean_imports.py` removes unused imports
 ## Tests
 
 ```bash
-./gradlew :app:testDebugUnitTest          # unit tests
-./gradlew :app:updateDebugScreenshotTest   # render the screens to PNG
+./gradlew :app:testDebugUnitTest                                  # unit tests
+./gradlew :app:testDebugUnitTest -Pgitdroid.screenshots \
+        --tests '*ScreenshotTest*'                                # render PNGs
 ```
 
-The screenshot tests render the real Compose UI through Robolectric, so the
-design can be reviewed without a device.
+The screenshot tests render the real Compose UI through Robolectric and write
+PNGs to `app/build/screenshots/`, so the design can be reviewed without a
+device. They are excluded from an ordinary test run because Robolectric needs
+to download its own android-all jars; the `Screenshots` workflow runs them on
+its own schedule and uploads the images.
+
+**Screenshot the shell, not just a row.** `ShellScreenshotTest` renders the
+whole Scaffold — background, app bar, tab bar — because a test that renders
+one `RepoRow` in isolation cannot notice a missing page background or a tab
+bar that vanished. It uses the app's own `ShellTabBar` and
+`TopLevelDestination` rather than a copy, so it cannot drift from what ships.
 
 ## Layout
 
@@ -99,7 +109,7 @@ app/src/main/java/dev/gitdroid/app/
 2. Read state from `GitRepository` flows; write through its methods.
 3. Wire it into the shell in `ui/GitDroidApp.kt`.
 4. Keep it dense and thumb-first — this is a phone, not a desktop.
-5. Add a preview to `ui/preview/Previews.kt` and a screenshot to
-   `app/src/screenshotTest/`.
+5. Add a preview to `ui/preview/Previews.kt` and a capture to
+   `app/src/test/java/dev/gitdroid/app/screenshot/`.
 
 More detail: [`docs/AGENTS.md`](docs/AGENTS.md).
