@@ -99,7 +99,6 @@ fun ReposScreen(
 
     var query by remember { mutableStateOf("") }
     var switcherOpen by remember { mutableStateOf(false) }
-    var menuFor by remember { mutableStateOf<Repository?>(null) }
 
     val filtered = remember(repos, query) {
         if (query.isBlank()) {
@@ -217,12 +216,27 @@ fun ReposScreen(
                         modifier = Modifier.padding(horizontal = space.gutter),
                         onClick = { onOpenRepo(repo) },
                         trailing = {
-                            IconButton(onClick = { menuFor = repo }) {
-                                Icon(
-                                    imageVector = Icons.Rounded.MoreVert,
-                                    contentDescription = "Repository actions",
-                                    modifier = Modifier.size(18.dp),
-                                    tint = colors.textTertiary,
+                            var open by remember(repo.id) { mutableStateOf(false) }
+                            ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }) {
+                                IconButton(
+                                    onClick = { open = true },
+                                    modifier = Modifier.menuAnchor(),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.MoreVert,
+                                        contentDescription = "Repository actions",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = colors.textTertiary,
+                                    )
+                                }
+                                RepoMenu(
+                                    expanded = open,
+                                    repo = repo,
+                                    pinned = pinned.contains(repo.fullName),
+                                    onDismiss = { open = false },
+                                    onOpen = { open = false; onOpenRepo(repo) },
+                                    onTogglePin = { open = false; repository.togglePinned(repo.fullName) },
+                                    onToggleStar = { open = false; scope.launch { repository.toggleStar(repo) } },
                                 )
                             }
                         },
