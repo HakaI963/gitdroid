@@ -1048,7 +1048,7 @@ class McpTools(
             args.string("status"),
             args.int("page") ?: 1,
             args.int("perPage") ?: 30,
-        ).body
+        )
         val payload = buildJsonObject {
             putJsonArray("runs") {
                 runs.forEach { run ->

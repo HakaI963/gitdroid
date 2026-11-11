@@ -27,7 +27,12 @@ import dev.gitdroid.app.core.api.Label
 import dev.gitdroid.app.core.api.User
 import dev.gitdroid.app.core.api.WorkflowRun
 import dev.gitdroid.app.ui.components.MetaPill
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import dev.gitdroid.app.AppContainer
 import dev.gitdroid.app.ui.components.RepoRow
+import dev.gitdroid.app.ui.screens.RepoOverview
 import dev.gitdroid.app.ui.preview.SampleRepos
 import dev.gitdroid.app.ui.components.StatusDot
 import dev.gitdroid.app.ui.screens.RunStatusIcon
@@ -36,6 +41,7 @@ import dev.gitdroid.app.ui.theme.ThemeMode
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -110,6 +116,28 @@ class ScreenshotTest {
                 modifier = Modifier.padding(top = 24.dp),
             )
         }
+    }
+
+    /** The repository header with its GitHub-style content. */
+    @Test
+    fun repoOverview() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val container = AppContainer(context)
+        compose.setContent {
+            GitDroidTheme(themeMode = ThemeMode.DARK) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    Column(Modifier.padding(vertical = 12.dp)) {
+                        RepoOverview(
+                            repository = container.repository,
+                            repo = SampleRepos.first(),
+                            branch = "main",
+                            onRequestBranchSheet = {},
+                        )
+                    }
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("build/screenshots/09-repo-overview.png")
     }
 
     @Test

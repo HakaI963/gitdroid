@@ -30,6 +30,9 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -41,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -259,12 +263,30 @@ fun ReposScreen(
                     modifier = Modifier.padding(horizontal = space.gutter),
                     onClick = { onOpenRepo(repo) },
                     trailing = {
-                        IconButton(onClick = { menuFor = repo }) {
-                            Icon(
-                                imageVector = Icons.Rounded.MoreVert,
-                                contentDescription = "Repository actions",
-                                modifier = Modifier.size(18.dp),
-                                tint = colors.textTertiary,
+                        var open by remember(repo.id) { mutableStateOf(false) }
+                        ExposedDropdownMenuBox(
+                            expanded = open,
+                            onExpandedChange = { open = it },
+                        ) {
+                            IconButton(
+                                onClick = { open = true },
+                                modifier = Modifier.menuAnchor(),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.MoreVert,
+                                    contentDescription = "Repository actions",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = colors.textTertiary,
+                                )
+                            }
+                            RepoMenu(
+                                expanded = open,
+                                repo = repo,
+                                pinned = pinned.contains(repo.fullName),
+                                onDismiss = { open = false },
+                                onOpen = { open = false; onOpenRepo(repo) },
+                                onTogglePin = { open = false; repository.togglePinned(repo.fullName) },
+                                onToggleStar = { open = false; scope.launch { repository.toggleStar(repo) } },
                             )
                         }
                     },
@@ -282,30 +304,6 @@ fun ReposScreen(
             icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
             text = { Text("New repo", style = type.label) },
         )
-
-        if (menuFor != null) {
-            val repo = menuFor!!
-            RepoContextMenu(
-                repo = repo,
-                onDismiss = { menuFor = null },
-                onOpen = {
-                    menuFor = null
-                    onOpenRepo(repo)
-                },
-                onTogglePin = {
-                    menuFor = null
-                    repository.togglePinned(repo.fullName)
-                },
-                onToggleStar = {
-                    menuFor = null
-                    scope.launch { repository.toggleStar(repo) }
-                },
-                onOpenSearch = {
-                    menuFor = null
-                    onOpenSearch()
-                },
-            )
-        }
 
         if (switcherOpen) {
             RepoSwitcherSheet(
@@ -389,37 +387,39 @@ private fun PinnedRepoCard(
     }
 }
 
-/** The long-press / overflow menu of a repository row. */
+/** The overflow menu of a repository row, anchored to the row's own button. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RepoContextMenu(
+private fun RepoMenu(
+    expanded: Boolean,
     repo: Repository,
+    pinned: Boolean,
     onDismiss: () -> Unit,
     onOpen: () -> Unit,
     onTogglePin: () -> Unit,
     onToggleStar: () -> Unit,
-    onOpenSearch: () -> Unit,
 ) {
     val type = LocalType.current
-    DropdownMenu(expanded = true, onDismissRequest = onDismiss) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(
-            text = { Text("Open", style = type.body) },
+            text = { Text("Open repository", style = type.body) },
             onClick = onOpen,
             leadingIcon = { Icon(Icons.Rounded.ChevronRight, contentDescription = null) },
         )
         DropdownMenuItem(
-            text = { Text("Pin to top", style = type.body) },
+            text = { Text(if (pinned) "Unpin from top" else "Pin to top", style = type.body) },
             onClick = onTogglePin,
-            leadingIcon = { Icon(Icons.Rounded.StarBorder, contentDescription = null) },
+            leadingIcon = {
+                Icon(
+                    imageVector = if (pinned) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                    contentDescription = null,
+                )
+            },
         )
         DropdownMenuItem(
-            text = { Text("Toggle star", style = type.body) },
+            text = { Text(if (repo.fork) "Un-star" else "Star on GitHub", style = type.body) },
             onClick = onToggleStar,
             leadingIcon = { Icon(Icons.Rounded.Star, contentDescription = null) },
-        )
-        DropdownMenuItem(
-            text = { Text("Search on GitHub", style = type.body) },
-            onClick = onOpenSearch,
-            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
         )
     }
 }

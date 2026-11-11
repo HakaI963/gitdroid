@@ -43,7 +43,7 @@ for art in material3 ui ui-graphics ui-text ui-unit ui-geometry ui-util \
            lifecycle-vm-compose lifecycle-runtime-compose lifecycle-common \
            lifecycle-runtime lifecycle-viewmodel lifecycle-viewmodel-savedstate \
            savedstate activity activity-ktx activity-compose core core-ktx \
-           datastore coil coil-base okhttp ks-json ks-core work-runtime zxing \
+           datastore coil coil-base coil-compose-base okhttp ks-json ks-core work-runtime zxing \
            uitest uitest-core test-ext-junit test-core; do
   # A dependency can live in three places: the unpacked AAR's classes.jar,
   # a plain jar in the cache, or a loose jar beside it.

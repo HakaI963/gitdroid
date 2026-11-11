@@ -1,6 +1,5 @@
 package dev.gitdroid.app.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
@@ -46,7 +44,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +53,7 @@ import coil.compose.AsyncImage
 import dev.gitdroid.app.core.repo.FileContent
 import dev.gitdroid.app.core.repo.GitRepository
 import dev.gitdroid.app.ui.components.CodeWell
+import dev.gitdroid.app.ui.components.MarkdownBody
 import dev.gitdroid.app.ui.components.EmptyState
 import dev.gitdroid.app.ui.components.GlassCard
 import dev.gitdroid.app.ui.theme.LocalGitDroidColors
@@ -312,11 +310,6 @@ private fun MarkdownContent(
     modifier: Modifier = Modifier,
 ) {
     val space = LocalSpace.current
-    val type = LocalType.current
-    val colors = LocalGitDroidColors.current
-
-    val blocks = remember(content) { parseMarkdown(content) }
-
     LazyColumn(
         modifier = modifier,
         contentPadding = PaddingValues(
@@ -324,83 +317,8 @@ private fun MarkdownContent(
             end = space.gutter,
             bottom = space.xxxl,
         ),
-        verticalArrangement = Arrangement.spacedBy(space.sm),
     ) {
-        items(blocks.size) { index ->
-            val block = blocks[index]
-            when (block) {
-                is MarkdownBlock.Heading -> Text(
-                    text = block.text,
-                    style = when (block.level) {
-                        1 -> type.headline
-                        2 -> type.title
-                        else -> type.titleSmall
-                    },
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = space.sm),
-                )
-
-                is MarkdownBlock.Paragraph -> SelectionContainer {
-                    Text(
-                        text = block.text,
-                        style = type.body,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                is MarkdownBlock.Bullet -> Row {
-                    Text(
-                        text = "•",
-                        style = type.body,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.width(space.sm))
-                    SelectionContainer {
-                        Text(
-                            text = block.text,
-                            style = type.body,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                is MarkdownBlock.Code -> CodeWell(modifier = Modifier.fillMaxWidth()) {
-                    SelectionContainer {
-                        Text(
-                            text = block.text,
-                            style = type.code,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(space.md),
-                        )
-                    }
-                }
-
-                is MarkdownBlock.Rule -> Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(colors.rule),
-                )
-
-                is MarkdownBlock.Quote -> Row {
-                    Box(
-                        Modifier
-                            .width(3.dp)
-                            .height(20.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.primary),
-                    )
-                    Spacer(Modifier.width(space.md))
-                    SelectionContainer {
-                        Text(
-                            text = block.text,
-                            style = type.body,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
+        item { MarkdownBody(content = content, modifier = Modifier.padding(top = space.sm)) }
     }
 }
 
@@ -526,107 +444,6 @@ private fun EditSheet(
         }
     }
 }
-
-// ── Markdown parsing ────────────────────────────────────────────────────────
-
-/** The block types the renderer understands. */
-sealed interface MarkdownBlock {
-    data class Heading(val level: Int, val text: String) : MarkdownBlock
-    data class Paragraph(val text: String) : MarkdownBlock
-    data class Bullet(val text: String) : MarkdownBlock
-    data class Code(val text: String) : MarkdownBlock
-    data class Quote(val text: String) : MarkdownBlock
-    data object Rule : MarkdownBlock
-}
-
-/**
- * A deliberately small Markdown parser.
- *
- * It handles the parts of a README that actually matter on a phone —
- * headings, paragraphs, lists, fenced code, quotes and rules — and leaves
- * everything else as text. Full CommonMark is not the point here; readable
- * README output in 120 lines is.
- */
-fun parseMarkdown(source: String): List<MarkdownBlock> {
-    val blocks = mutableListOf<MarkdownBlock>()
-    val lines = source.lines()
-    var index = 0
-
-    while (index < lines.size) {
-        val raw = lines[index]
-        val trimmed = raw.trim()
-
-        when {
-            trimmed.startsWith("```") -> {
-                val body = mutableListOf<String>()
-                index++
-                while (index < lines.size && !lines[index].trim().startsWith("```")) {
-                    body += lines[index]
-                    index++
-                }
-                index++ // skip the closing fence
-                blocks += MarkdownBlock.Code(body.joinToString("\n"))
-            }
-
-            trimmed.isEmpty() -> index++
-
-            trimmed.startsWith("#") -> {
-                val level = trimmed.takeWhile { it == '#' }.length.coerceIn(1, 6)
-                val text = trimmed.drop(level).trim()
-                blocks += MarkdownBlock.Heading(level, stripInline(text))
-                index++
-            }
-
-            trimmed == "---" || trimmed == "***" || trimmed == "___" -> {
-                blocks += MarkdownBlock.Rule
-                index++
-            }
-
-            trimmed.startsWith("> ") -> {
-                blocks += MarkdownBlock.Quote(stripInline(trimmed.removePrefix("> ")))
-                index++
-            }
-
-            trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("+ ") -> {
-                blocks += MarkdownBlock.Bullet(stripInline(trimmed.drop(2)))
-                index++
-            }
-
-            else -> {
-                val paragraph = mutableListOf<String>()
-                while (index < lines.size) {
-                    val line = lines[index].trim()
-                    if (line.isEmpty() ||
-                        line.startsWith("#") ||
-                        line.startsWith("```") ||
-                        line.startsWith("> ") ||
-                        line.startsWith("- ") ||
-                        line.startsWith("* ")
-                    ) {
-                        break
-                    }
-                    paragraph += line
-                    index++
-                }
-                if (paragraph.isNotEmpty()) {
-                    blocks += MarkdownBlock.Paragraph(stripInline(paragraph.joinToString(" ")))
-                }
-            }
-        }
-    }
-
-    return blocks
-}
-
-/** Removes the inline Markdown markers, keeping the words. */
-private fun stripInline(text: String): String = text
-    .replace(Regex("!\\[([^\\]]*)]\\([^)]*\\)"), "$1")
-    .replace(Regex("\\[([^\\]]*)]\\([^)]*\\)"), "$1")
-    .replace(Regex("\\*\\*(.+?)\\*\\*"), "$1")
-    .replace(Regex("(?<!\\*)\\*(.+?)\\*(?!\\*)"), "$1")
-    .replace(Regex("(?<!_)_(.+?)_(?!_)"), "$1")
-    .replace(Regex("`(.+?)`"), "$1")
-    .trim()
 
 /** The file extensions the viewer treats as images. */
 val IMAGE_EXTENSIONS = listOf(".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg")

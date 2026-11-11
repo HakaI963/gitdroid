@@ -19,24 +19,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.CallSplit
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.Code
-import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -101,6 +96,8 @@ fun RepoDetailScreen(
     onOpenIssue: (Int) -> Unit,
     onOpenPull: (Int) -> Unit,
     onOpenRun: (Long) -> Unit,
+    downloader: dev.gitdroid.app.core.download.Downloader,
+    onDownloadState: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val space = LocalSpace.current
@@ -122,92 +119,13 @@ fun RepoDetailScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // ── Header ──────────────────────────────────────────────────────
-        GlassCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = space.gutter, vertical = space.sm),
-            shape = MaterialTheme.shapes.large,
-        ) {
-            Column(Modifier.padding(space.md)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowBack,
-                            contentDescription = "Back",
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(space.xs))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = repo.name,
-                            style = type.title,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = repo.ownerLogin,
-                            style = type.bodySmall,
-                            color = colors.textTertiary,
-                        )
-                    }
-                    if (repo.isPrivate) {
-                        Icon(
-                            imageVector = Icons.Rounded.Lock,
-                            contentDescription = "Private",
-                            modifier = Modifier.size(15.dp),
-                            tint = colors.textTertiary,
-                        )
-                    }
-                    Spacer(Modifier.width(space.sm))
-                    IconButton(
-                        onClick = { scope.launch { repository.toggleStar(repo) } },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Star,
-                            contentDescription = "Star",
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-
-                if (repo.description != null) {
-                    Spacer(Modifier.height(space.xs))
-                    Text(
-                        text = repo.description,
-                        style = type.bodySmall,
-                        color = colors.textTertiary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                Spacer(Modifier.height(space.md))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(space.sm),
-                ) {
-                    MetaPill(
-                        text = currentBranch,
-                        color = MaterialTheme.colorScheme.secondary,
-                        background = MaterialTheme.colorScheme.secondaryContainer,
-                        modifier = Modifier.clickable { branchSheet = true },
-                    )
-                    if (repo.language != null) {
-                        MetaPill(
-                            text = repo.language,
-                            color = colors.textTertiary,
-                        )
-                    }
-                    MetaPill(text = "★ ${repo.stargazersCount}", color = colors.textTertiary)
-                    MetaPill(text = "⑂ ${repo.forksCount}", color = colors.textTertiary)
-                }
-            }
-        }
+        // ── Header ─────────────────────────────────────────────────────
+        RepoOverview(
+            repository = repository,
+            repo = repo,
+            branch = currentBranch,
+            onRequestBranchSheet = { branchSheet = true },
+        )
 
         // ── Tabs ────────────────────────────────────────────────────────
         ScrollableTabRow(
@@ -238,7 +156,7 @@ fun RepoDetailScreen(
             modifier = Modifier.weight(1f),
         ) { index ->
             when (RepoTab.entries[index]) {
-                RepoTab.CODE -> CodeTab(
+                RepoTab.CODE -> CodeBrowser(
                     repository = repository,
                     repo = repo,
                     branch = currentBranch,
@@ -267,6 +185,8 @@ fun RepoDetailScreen(
                 RepoTab.RELEASES -> ReleasesTab(
                     repository = repository,
                     repo = repo,
+                    downloader = downloader,
+                    onDownloadState = onDownloadState,
                 )
 
                 RepoTab.SETTINGS -> RepoSettingsTab(
@@ -409,130 +329,7 @@ private fun InfoRow(label: String, value: String) {
     }
 }
 
-// ── Code tab ────────────────────────────────────────────────────────────────
-
-@Composable
-private fun CodeTab(
-    repository: GitRepository,
-    repo: Repository,
-    branch: String,
-    onOpenFile: (String) -> Unit,
-    onRequestBranchSheet: () -> Unit,
-) {
-    val space = LocalSpace.current
-    val type = LocalType.current
-    val colors = LocalGitDroidColors.current
-    val scope = rememberCoroutineScope()
-
-    var entries by remember { mutableStateOf<List<dev.gitdroid.app.core.repo.DirEntry>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-
-    LaunchedEffect(repo.fullName, branch) {
-        loading = true
-        entries = repository.listDirectory(repo.ownerLogin, repo.name, "", branch)
-        loading = false
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = space.gutter,
-            end = space.gutter,
-            bottom = space.xxxl,
-        ),
-        verticalArrangement = Arrangement.spacedBy(space.rowGap),
-    ) {
-        item(key = "branch") {
-            GlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                onClick = onRequestBranchSheet,
-            ) {
-                Row(
-                    modifier = Modifier.padding(space.md),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = "Branch",
-                            style = type.labelSmall,
-                            color = colors.textTertiary,
-                        )
-                        Text(
-                            text = branch,
-                            style = type.titleSmall,
-                            color = MaterialTheme.colorScheme.secondary,
-                        )
-                    }
-                    Text(
-                        text = "Change",
-                        style = type.label,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-        }
-
-        if (!loading && entries.isEmpty()) {
-            item(key = "empty") {
-                EmptyState(
-                    icon = Icons.Rounded.Code,
-                    title = "Nothing here",
-                    message = "This branch has no files at the root.",
-                )
-            }
-        }
-
-        items(entries, key = { it.path }) { entry ->
-            GlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.small,
-                onClick = { onOpenFile(entry.path) },
-            ) {
-                Row(
-                    modifier = Modifier.padding(
-                        start = space.md,
-                        end = space.md,
-                        top = space.sm,
-                        bottom = space.sm,
-                    ),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = if (entry.isDirectory) {
-                            Icons.Rounded.Code
-                        } else {
-                            Icons.Rounded.Description
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = if (entry.isDirectory) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            colors.textTertiary
-                        },
-                    )
-                    Spacer(Modifier.width(space.sm))
-                    Text(
-                        text = entry.name,
-                        style = type.body,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (!entry.isDirectory && entry.size > 0) {
-                        Text(
-                            text = formatBytes(entry.size),
-                            style = type.labelSmall,
-                            color = colors.textTertiary,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
+// ── Code tab ──────────────────────────────────────────────────────────────
 
 // ── Issues tab ──────────────────────────────────────────────────────────────
 
@@ -862,89 +659,6 @@ fun RunStatusIcon(
         tint = tint,
     )
 }
-
-// ── Releases tab ────────────────────────────────────────────────────────────
-
-@Composable
-private fun ReleasesTab(
-    repository: GitRepository,
-    repo: Repository,
-) {
-    val space = LocalSpace.current
-    val type = LocalType.current
-    val colors = LocalGitDroidColors.current
-
-    var releases by remember { mutableStateOf<List<dev.gitdroid.app.core.api.Release>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-
-    LaunchedEffect(repo.fullName) {
-        loading = true
-        releases = repository.releases(repo.ownerLogin, repo.name)
-        loading = false
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = space.gutter,
-            end = space.gutter,
-            bottom = space.xxxl,
-        ),
-        verticalArrangement = Arrangement.spacedBy(space.rowGap),
-    ) {
-        if (!loading && releases.isEmpty()) {
-            item(key = "empty") {
-                EmptyState(
-                    icon = Icons.Rounded.Star,
-                    title = "No releases",
-                    message = "This repository has not published a release.",
-                )
-            }
-        }
-
-        items(releases, key = { it.id }) { release ->
-            GlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Column(Modifier.padding(space.md)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = release.name?.ifBlank { release.tag_name } ?: release.tag_name,
-                            style = type.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (release.prerelease) {
-                            MetaPill(text = "Pre-release", color = colors.warning)
-                        }
-                        if (release.draft) {
-                            MetaPill(text = "Draft", color = colors.textTertiary)
-                        }
-                    }
-                    Text(
-                        text = release.tag_name,
-                        style = type.bodySmall,
-                        color = colors.textTertiary,
-                    )
-                    if (release.assets.isNotEmpty()) {
-                        Spacer(Modifier.height(space.sm))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(space.xs)) {
-                            items(release.assets, key = { it.id }) { asset ->
-                                MetaPill(
-                                    text = "${asset.name} · ${formatBytes(asset.size)}",
-                                    color = MaterialTheme.colorScheme.secondary,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── Shared small pieces ─────────────────────────────────────────────────────
 
 /** A two-way filter tab. */
 @Composable

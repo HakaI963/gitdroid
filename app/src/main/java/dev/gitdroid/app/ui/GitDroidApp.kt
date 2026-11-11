@@ -2,16 +2,18 @@ package dev.gitdroid.app.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Cable
+import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -20,24 +22,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import dev.gitdroid.app.AppContainer
 import dev.gitdroid.app.core.api.Repository
 import dev.gitdroid.app.core.auth.SessionState
@@ -84,12 +88,15 @@ fun GitDroidApp(
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
 ) {
-    val type = dev.gitdroid.app.ui.theme.LocalType.current
+    val type = LocalType.current
+    val colors = LocalGitDroidColors.current
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val session by container.authManager.state.collectAsStateCompat()
     val mcpPort by container.mcpPort.collectAsStateCompat()
     val mcpRunning by container.mcpRunning.collectAsStateCompat()
+    val refreshing by container.repository.reposRefreshing.collectAsStateCompat()
 
     var destination by remember { mutableStateOf(TopLevelDestination.REPOS) }
     var repo by remember { mutableStateOf<Repository?>(null) }
@@ -99,20 +106,20 @@ fun GitDroidApp(
     var createRepoOpen by remember { mutableStateOf(false) }
     var cacheSize by remember { mutableStateOf(0L) }
 
+    val snackbar = remember { SnackbarHostState() }
     val downloader = remember { Downloader(context, container.api) }
 
-    // Measure the cache once, off the hot path.
     LaunchedEffect(Unit) {
         cacheSize = container.diskCache.sizeBytes()
     }
 
-    /**
-     * The back button pops the detail stack before it pops the app.
-     *
-     * The stack is shallow — file, issue, run, repository, then the tabs — so
-     * it is written out explicitly.
-     */
+    /** Reports a finished download without replacing the screen it came from. */
+    fun announce(message: String) {
+        scope.launch { snackbar.showSnackbar(message) }
+    }
+
     val inDetail = filePath != null || issueNumber != null || runId != null || repo != null
+
     BackHandler(enabled = inDetail) {
         when {
             filePath != null -> filePath = null
@@ -135,8 +142,11 @@ fun GitDroidApp(
                 // Detail screens carry their own header, so the app bar only
                 // belongs to the tabs.
                 if (!inDetail) {
-                    val refreshing by container.repository.reposRefreshing.collectAsStateCompat()
-                    ShellHeader(login = current.login, avatarUrl = current.avatarUrl, syncing = refreshing)
+                    ShellHeader(
+                        login = current.login,
+                        syncing = refreshing,
+                        onOpenAccount = { destination = TopLevelDestination.SETTINGS },
+                    )
                 }
             },
             bottomBar = {
@@ -170,6 +180,7 @@ fun GitDroidApp(
                     }
                 }
             },
+            snackbarHost = { SnackbarHost(snackbar) },
             containerColor = Color.Transparent,
         ) { innerPadding ->
             PageBackground(Modifier.fillMaxSize()) {
@@ -203,9 +214,18 @@ fun GitDroidApp(
                             branch = container.repository.branchFor(repo!!),
                             onBack = { filePath = null },
                             onDownload = { content ->
-                                // Downloads run in the background; the UI stays put.
                                 container.scope.launch {
-                                    downloader.downloadFile(content, repo!!.ownerLogin, repo!!.name)
+                                    val result = downloader.downloadFile(
+                                        content,
+                                        repo!!.ownerLogin,
+                                        repo!!.name,
+                                    )
+                                    announce(
+                                        when (result) {
+                                            is Downloader.Result.Success -> "Saved ${result.displayName}"
+                                            is Downloader.Result.Failure -> result.message
+                                        },
+                                    )
                                 }
                             },
                         )
@@ -213,6 +233,8 @@ fun GitDroidApp(
                         repo != null -> RepoDetailScreen(
                             repository = container.repository,
                             repo = repo!!,
+                            downloader = downloader,
+                            onDownloadState = ::announce,
                             onBack = { repo = null },
                             onOpenFile = { path -> filePath = path },
                             onOpenIssue = { number -> issueNumber = number },
@@ -243,6 +265,7 @@ fun GitDroidApp(
                                 container.scope.launch {
                                     container.diskCache.clear()
                                     cacheSize = container.diskCache.sizeBytes()
+                                    announce("Cache cleared")
                                 }
                             },
                             onSignOut = { container.authManager.signOut() },
@@ -258,7 +281,10 @@ fun GitDroidApp(
                             onToggleServer = { enabled ->
                                 if (enabled) container.enableMcp() else container.disableMcp()
                             },
-                            onRotateToken = { container.rotateMcpToken() },
+                            onRotateToken = {
+                                container.rotateMcpToken()
+                                announce("New token — update your agents")
+                            },
                         )
                     }
                 }
@@ -293,7 +319,7 @@ fun GitDroidApp(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ShellHeader(login: String, avatarUrl: String, syncing: Boolean) {
+private fun ShellHeader(login: String, syncing: Boolean, onOpenAccount: () -> Unit) {
     val type = LocalType.current
     val colors = LocalGitDroidColors.current
 
@@ -317,14 +343,15 @@ private fun ShellHeader(login: String, avatarUrl: String, syncing: Boolean) {
                 style = type.labelSmall,
                 color = colors.textTertiary,
                 maxLines = 1,
-                modifier = Modifier.padding(end = 12.dp),
+                modifier = Modifier.padding(end = 10.dp),
             )
             Box(
                 modifier = Modifier
-                    .padding(end = 12.dp)
+                    .padding(end = 14.dp)
                     .size(28.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clickable(onClick = onOpenAccount),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

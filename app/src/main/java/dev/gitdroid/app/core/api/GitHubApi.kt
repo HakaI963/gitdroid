@@ -2,6 +2,7 @@ package dev.gitdroid.app.core.api
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -252,8 +253,13 @@ class GitHubApi(
 
     // ── Actions ─────────────────────────────────────────────────────────────
 
+    /**
+     * GitHub wraps the Actions collections in an object
+     * (`{"total_count":n,"workflows":[…]}`) instead of returning a bare
+     * array, so they need unwrapping before decoding.
+     */
     suspend fun listWorkflows(owner: String, repo: String): List<Workflow> =
-        get("repos/$owner/$repo/actions/workflows?per_page=100")
+        getWrapped("repos/$owner/$repo/actions/workflows?per_page=100", "workflows")
 
     suspend fun listWorkflowRuns(
         owner: String,
@@ -262,7 +268,7 @@ class GitHubApi(
         status: String? = null,
         page: Int = 1,
         perPage: Int = 30,
-    ): Response<List<WorkflowRun>> {
+    ): List<WorkflowRun> {
         val base = if (workflowId != null) {
             "repos/$owner/$repo/actions/workflows/$workflowId/runs"
         } else {
@@ -272,14 +278,18 @@ class GitHubApi(
             append("$base?per_page=$perPage&page=$page")
             if (status != null) append("&status=$status")
         }
-        return getPaged(query)
+        return getWrapped(query, "workflow_runs")
     }
 
     suspend fun workflowRun(owner: String, repo: String, runId: Long): WorkflowRun =
         get("repos/$owner/$repo/actions/runs/$runId")
 
     suspend fun workflowRunJobs(owner: String, repo: String, runId: Long): List<WorkflowJob> =
-        get("repos/$owner/$repo/actions/runs/$runId/jobs?per_page=100")
+        getWrapped("repos/$owner/$repo/actions/runs/$runId/jobs?per_page=100", "jobs")
+
+    /** The artefacts attached to a run — what "download stuff" means for CI. */
+    suspend fun workflowRunArtifacts(owner: String, repo: String, runId: Long): List<Artifact> =
+        getWrapped("repos/$owner/$repo/actions/runs/$runId/artifacts?per_page=100", "artifacts")
 
     suspend fun rerunWorkflow(owner: String, repo: String, runId: Long) {
         post<Unit>("repos/$owner/$repo/actions/runs/$runId/rerun", EmptyBody)
@@ -345,6 +355,31 @@ class GitHubApi(
         return get("search/issues?$q")
     }
 
+    // ── Activity, people, languages ─────────────────────────────────────────
+
+    /** Contributors ranked by commit count, the way github.com lists them. */
+    suspend fun listContributors(owner: String, repo: String, perPage: Int = 10): List<Contributor> =
+        get("repos/$owner/$repo/contributors?per_page=$perPage")
+
+    /** Bytes of code per language, which is what the language bar renders. */
+    suspend fun languageStats(owner: String, repo: String): Map<String, Long> =
+        get("repos/$owner/$repo/languages")
+
+    /** The latest commit on a ref — the row header github.com shows per folder. */
+    suspend fun latestCommit(owner: String, repo: String, ref: String? = null): Commit {
+        val query = if (ref != null) "repos/$owner/$repo/commits?sha=${encodeQuery(ref)}&per_page=1"
+        else "repos/$owner/$repo/commits?per_page=1"
+        val list: List<Commit> = get(query)
+        return list.first()
+    }
+
+    /** Open pull requests and issues, counted the way the repo header counts them. */
+    suspend fun openCounts(owner: String, repo: String): Pair<Int, Int> {
+        val issues: List<Issue> = get("repos/$owner/$repo/issues?state=open&per_page=1")
+        val pulls: List<PullRequest> = get("repos/$owner/$repo/pulls?state=open&per_page=100")
+        return issues.size to pulls.size
+    }
+
     // ── Notifications ───────────────────────────────────────────────────────
 
     suspend fun listNotifications(
@@ -365,6 +400,21 @@ class GitHubApi(
 
     suspend inline fun <reified T> get(path: String): T =
         decodeElement(getElement(path))
+
+    /**
+     * Decodes a list that GitHub nests inside an object under [key] — the
+     * Actions endpoints and a few others do this instead of returning a bare
+     * array.
+     */
+    suspend inline fun <reified T> getWrapped(path: String, key: String): List<T> {
+        val element = getElement(path)
+        val array = (element as? JsonObject)?.get(key) as? JsonArray
+            ?: throw ParseException("Expected a \"$key\" array from $path")
+        return GitHubJson.decodeFromJsonElement(
+            kotlinx.serialization.builtins.ListSerializer(serializer<T>()),
+            array,
+        )
+    }
 
     suspend inline fun <reified T> getPaged(path: String): Response<List<T>> {
         val raw = execute(request(path).get().build(), path)

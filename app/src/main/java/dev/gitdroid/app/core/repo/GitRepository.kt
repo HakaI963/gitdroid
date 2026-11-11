@@ -1,6 +1,9 @@
 package dev.gitdroid.app.core.repo
 
+import dev.gitdroid.app.core.api.Artifact
 import dev.gitdroid.app.core.api.CodeSearchResult
+import dev.gitdroid.app.core.api.Commit
+import dev.gitdroid.app.core.api.Contributor
 import dev.gitdroid.app.core.api.CreateFileRequest
 import dev.gitdroid.app.core.api.CreateIssueRequest
 import dev.gitdroid.app.core.api.CreatePullRequestRequest
@@ -379,6 +382,7 @@ class GitRepository(
         runCatching { api.listWorkflows(owner, repo) }.getOrElse { emptyList() }
 
     /** Lists workflow runs. */
+    /** The runs of a repo, newest first, falling back to the cache. */
     suspend fun workflowRuns(
         owner: String,
         repo: String,
@@ -386,13 +390,17 @@ class GitRepository(
     ): List<WorkflowRun> {
         val key = "runs:$owner/$repo:${workflowId ?: "all"}"
         return runCatching {
-            val runs = api.listWorkflowRuns(owner, repo, workflowId).body
+            val runs = api.listWorkflowRuns(owner, repo, workflowId)
             cache.write(key, runs)
             runs
         }.getOrElse {
             cache.read<List<WorkflowRun>>(key)?.value.orEmpty()
         }
     }
+
+    /** The artefacts of a run, for downloading build output. */
+    suspend fun workflowArtifacts(owner: String, repo: String, runId: Long): List<Artifact> =
+        runCatching { api.workflowRunArtifacts(owner, repo, runId) }.getOrElse { emptyList() }
 
     /** Loads one workflow run with its jobs. */
     suspend fun workflowRun(owner: String, repo: String, runId: Long): WorkflowRun? =
@@ -422,6 +430,18 @@ class GitRepository(
     }
 
     // ── Releases / tags ─────────────────────────────────────────────────────
+
+    /** Contributors ranked by commit count. */
+    suspend fun contributors(owner: String, repo: String): List<Contributor> =
+        runCatching { api.listContributors(owner, repo) }.getOrElse { emptyList() }
+
+    /** Bytes of code per language, for the language bar. */
+    suspend fun languageStats(owner: String, repo: String): Map<String, Long> =
+        runCatching { api.languageStats(owner, repo) }.getOrElse { emptyMap() }
+
+    /** The most recent commit on a ref. */
+    suspend fun latestCommit(owner: String, repo: String, ref: String): Commit? =
+        runCatching { api.latestCommit(owner, repo, ref) }.getOrNull()
 
     /** Lists releases. */
     suspend fun releases(owner: String, repo: String): List<Release> =

@@ -69,6 +69,19 @@ class Downloader(
         }
     }
 
+    /**
+     * Downloads one of a release's assets. These live on S3 and need no
+     * auth header, but sending it costs nothing and keeps private repos working.
+     */
+    suspend fun downloadAsset(url: String, name: String): Result =
+        withContext(Dispatchers.IO) {
+            try {
+                save(name.replace(Regex("[/\\\\:]"), "_"), fetchRaw(url))
+            } catch (e: Exception) {
+                Result.Failure(e.message ?: "The download failed")
+            }
+        }
+
     /** Fetches a URL with the user's token attached. */
     private fun fetchRaw(url: String): ByteArray {
         val request = Request.Builder()

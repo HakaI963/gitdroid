@@ -472,3 +472,22 @@ data class EmptyRequest(
     @SerialName("branch") val branch: String = "",
     @SerialName("sha") val sha: String = "",
 )
+
+@Serializable
+data class Artifact(
+    val id: Long = 0,
+    val name: String = "",
+    @SerialName("size_in_bytes") val sizeBytes: Long = 0,
+    @SerialName("archive_download_url") val archiveDownloadUrl: String = "",
+    @SerialName("expired") val expired: Boolean = false,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+)
+
+@Serializable
+data class Contributor(
+    val login: String = "",
+    val id: Long = 0,
+    @SerialName("avatar_url") val avatarUrl: String = "",
+    val contributions: Int = 0,
+)
