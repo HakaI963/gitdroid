@@ -1,10 +1,10 @@
 package dev.gitdroid.app.core.auth
 
 import dev.gitdroid.app.core.api.GitHubException
+import dev.gitdroid.app.core.api.GitHubJson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -31,10 +31,13 @@ enum class AuthMethod {
  * device, the app polls for the token in the background, and no browser
  * redirect has to be plumbed through the app. It also works with an
  * OAuth App client id that ships in the binary — no client secret is needed.
+ *
+ * The HTTP call is injected rather than hard-wired. The polling state machine
+ * is the part worth testing, and a socket makes it slow and flaky.
  */
 class DeviceFlowClient(
     private val clientId: String,
-    private val client: OkHttpClient = OkHttpClient(),
+    private val post: suspend (url: String, body: JsonObject) -> JsonObject = defaultPost,
     private val deviceCodeUrl: String = "https://github.com/login/device/code",
     private val accessTokenUrl: String = "https://github.com/login/oauth/access_token",
 ) {
@@ -65,32 +68,29 @@ class DeviceFlowClient(
     class CodeExpired(message: String) : Exception(message)
 
     /** Asks GitHub for a fresh user code. */
-    suspend fun requestCode(scope: String = DEFAULT_SCOPE): DeviceCode = withContext(Dispatchers.IO) {
-        val body = buildJsonObject {
-            put("client_id", clientId)
-            put("scope", scope)
-        }.toString()
-
-        val request = Request.Builder()
-            .url(deviceCodeUrl)
-            .header("Accept", "application/json")
-            .post(body.toRequestBody(JSON_MEDIA_TYPE))
-            .build()
-
-        val json = executeJson(request)
-        val deviceCode = json.string("device_code") ?: throw IOException("GitHub did not return a device code")
-        DeviceCode(
-            deviceCode = deviceCode,
-            userCode = json.string("user_code").orEmpty(),
-            verificationUri = json.string("verification_uri").orEmpty(),
-            verificationUriComplete = json.string("verification_uri_complete"),
-            expiresInSeconds = json.int("expires_in") ?: 900,
-            intervalSeconds = json.int("interval") ?: 5,
-        )
-    }
+    suspend fun requestCode(scope: String = DEFAULT_SCOPE): DeviceCode =
+        withContext(Dispatchers.IO) {
+            val json = post(
+                deviceCodeUrl,
+                buildJsonObject {
+                    put("client_id", clientId)
+                    put("scope", scope)
+                },
+            )
+            val deviceCode = json.string("device_code")
+                ?: throw IOException("GitHub did not return a device code")
+            DeviceCode(
+                deviceCode = deviceCode,
+                userCode = json.string("user_code").orEmpty(),
+                verificationUri = json.string("verification_uri").orEmpty(),
+                verificationUriComplete = json.string("verification_uri_complete"),
+                expiresInSeconds = json.int("expires_in") ?: 900,
+                intervalSeconds = json.int("interval") ?: 5,
+            )
+        }
 
     /**
-     * Polls until the user approves (or the code expires).
+     * Polls until the user approves, declines, or the code expires.
      *
      * [onTick] is called once per poll so the UI can show progress.
      */
@@ -106,53 +106,43 @@ class DeviceFlowClient(
             attempt++
             onTick(attempt)
 
-            val body = buildJsonObject {
-                put("client_id", clientId)
-                put("device_code", deviceCode.deviceCode)
-                put("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
-                if (scope.isNotBlank()) put("scope", scope)
-            }.toString()
+            val json = post(
+                accessTokenUrl,
+                buildJsonObject {
+                    put("client_id", clientId)
+                    put("device_code", deviceCode.deviceCode)
+                    put("grant_type", GRANT_TYPE)
+                    if (scope.isNotBlank()) put("scope", scope)
+                },
+            )
 
-            val request = Request.Builder()
-                .url(accessTokenUrl)
-                .header("Accept", "application/json")
-                .post(body.toRequestBody(JSON_MEDIA_TYPE))
-                .build()
+            when (val error = json.string("error")) {
+                // The absence of an `error` field *is* the success case: GitHub
+                // answers with the access token. Treating it like a pending
+                // request would keep polling until the code expired while the
+                // user watched a spinner — which is exactly the bug this
+                // comment guards against.
+                null -> return@withContext TokenResult(
+                    accessToken = json.string("access_token")
+                        ?: throw GitHubException(0, "GitHub sent no access token"),
+                    refreshToken = json.string("refresh_token"),
+                    tokenType = json.string("token_type").orEmpty(),
+                    scope = json.string("scope").orEmpty(),
+                    expiresInSeconds = json.int("expires_in") ?: 0,
+                )
 
-            val json = executeJson(request)
-            val error = json.string("error")
-            when {
-                // No `error` field means GitHub sent the token. This has to
-                // be checked before the pending branch, or a successful
-                // sign-in is mistaken for "keep waiting" and the code
-                // eventually expires while the user watches a spinner.
-                error == null -> {
-                    val token = json.string("access_token")
-                        ?: throw GitHubException(0, "GitHub sent no access token")
-                    return@withContext TokenResult(
-                        accessToken = token,
-                        refreshToken = json.string("refresh_token"),
-                        tokenType = json.string("token_type").orEmpty(),
-                        scope = json.string("scope").orEmpty(),
-                        expiresInSeconds = json.int("expires_in") ?: 0,
-                    )
-                }
+                "authorization_pending" -> delay(deviceCode.intervalSeconds * 1000L)
 
-                error == "authorization_pending" -> {
-                    delay(deviceCode.intervalSeconds * 1000L)
-                }
+                // GitHub asks for a longer gap; honour it or the flow stalls.
+                "slow_down" -> delay((deviceCode.intervalSeconds + 5) * 1000L)
 
-                error == "slow_down" -> {
-                    delay((deviceCode.intervalSeconds + 5) * 1000L)
-                }
+                "access_denied" -> throw AuthorizationDenied(
+                    json.string("error_description") ?: "Sign-in was declined",
+                )
 
-                error == "access_denied" -> {
-                    throw AuthorizationDenied("Sign-in was declined")
-                }
-
-                error == "expired_token" -> {
-                    throw CodeExpired("The code expired — start again")
-                }
+                "expired_token" -> throw CodeExpired(
+                    json.string("error_description") ?: "The code expired — start again",
+                )
 
                 else -> throw GitHubException(0, json.string("error_description") ?: "Sign-in failed")
             }
@@ -162,22 +152,17 @@ class DeviceFlowClient(
 
     /** Exchanges a refresh token for a new access token. */
     suspend fun refresh(refreshToken: String): TokenResult = withContext(Dispatchers.IO) {
-        val body = buildJsonObject {
-            put("client_id", clientId)
-            put("refresh_token", refreshToken)
-            put("grant_type", "refresh_token")
-        }.toString()
-
-        val request = Request.Builder()
-            .url(accessTokenUrl)
-            .header("Accept", "application/json")
-            .post(body.toRequestBody(JSON_MEDIA_TYPE))
-            .build()
-
-        val json = executeJson(request)
-        val token = json.string("access_token") ?: throw IOException("Could not refresh the token")
+        val json = post(
+            accessTokenUrl,
+            buildJsonObject {
+                put("client_id", clientId)
+                put("refresh_token", refreshToken)
+                put("grant_type", "refresh_token")
+            },
+        )
         TokenResult(
-            accessToken = token,
+            accessToken = json.string("access_token")
+                ?: throw IOException("Could not refresh the token"),
             refreshToken = json.string("refresh_token"),
             tokenType = json.string("token_type").orEmpty(),
             scope = json.string("scope").orEmpty(),
@@ -185,33 +170,10 @@ class DeviceFlowClient(
         )
     }
 
-    private fun executeJson(request: Request): JsonObject {
-        val response = try {
-            client.newCall(request).execute()
-        } catch (e: IOException) {
-            throw GitHubException(0, e.message ?: "Network error")
-        }
-        response.use {
-            val body = it.body?.string().orEmpty()
-            if (!it.isSuccessful) {
-                throw GitHubException(it.code, "GitHub returned HTTP ${it.code}")
-            }
-            val element = runCatching { Json.parseToJsonElement(body) }.getOrNull()
-            return element as? JsonObject ?: throw IOException("Unexpected response from GitHub")
-        }
-    }
-
-    private fun JsonObject.string(key: String): String? =
-        (this[key] as? JsonPrimitive)?.contentOrNullSafe()
-
-    private fun JsonObject.int(key: String): Int? =
-        (this[key] as? JsonPrimitive)?.contentOrNullSafe()?.toIntOrNull()
-
-    private fun JsonPrimitive.contentOrNullSafe(): String? =
-        if (this is JsonPrimitive && content != "null") content else null
-
     companion object {
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        private const val GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code"
 
         /**
          * The scope GitDroid asks for.
@@ -229,5 +191,39 @@ class DeviceFlowClient(
          * when you fork this project — see the README.
          */
         const val CLIENT_ID = "Iv1.b507a08c87ecfe98"
+
+        /** The real transport: POST JSON to GitHub and read JSON back. */
+        private val defaultPost: suspend (String, JsonObject) -> JsonObject = { url, body ->
+            val client = sharedClient
+            val request = Request.Builder()
+                .url(url)
+                .header("Accept", "application/json")
+                .header("User-Agent", "GitDroid/1.0 (Android)")
+                .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    throw GitHubException(response.code, "GitHub returned HTTP ${response.code}")
+                }
+                GitHubJson.parseToJsonElement(text) as? JsonObject
+                    ?: throw IOException("Unexpected response from GitHub")
+            }
+        }
+
+        private val sharedClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+        }
     }
 }
+
+private fun JsonObject.string(key: String): String? =
+    (this[key] as? JsonPrimitive)
+        ?.takeIf { it.isString || it.content != "null" }
+        ?.content
+
+private fun JsonObject.int(key: String): Int? = string(key)?.toIntOrNull()

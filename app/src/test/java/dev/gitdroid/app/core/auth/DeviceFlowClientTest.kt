@@ -1,103 +1,73 @@
 package dev.gitdroid.app.core.auth
 
-import com.sun.net.httpserver.HttpServer
+import dev.gitdroid.app.core.api.GitHubJson
 import kotlinx.coroutines.runBlocking
-import org.junit.After
+import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
-import java.net.InetSocketAddress
 
 /**
- * Device-flow tests against a stub of GitHub's endpoints.
+ * Device-flow tests against a stubbed transport.
  *
- * The bug these guard against: a successful poll returns a body with **no
- * `error` field**, and that was treated the same as `authorization_pending`,
- * so the app polled until the code expired while the user watched a spinner.
+ * The bug these guard against is the one that made sign-in hang forever: a
+ * successful poll returns a body with **no `error` field**, and that was
+ * treated the same as `authorization_pending`, so the app polled until the
+ * code expired while the user watched a spinner.
  */
 class DeviceFlowClientTest {
 
-    private lateinit var server: HttpServer
-    private var port = 0
-
     /** The responses the stub serves, in order. */
-    private val queue = ArrayDeque<String>()
+    private val replies = ArrayDeque<JsonObject>()
 
-    /** Bodies the stub actually received, so the test can assert on them. */
-    private val received = mutableListOf<String>()
+    /** The request bodies the stub received. */
+    private val sent = mutableListOf<JsonObject>()
 
-    @Before
-    fun startServer() {
-        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/login/device/code") { exchange ->
-            val body = """
-                {"device_code":"DEV-CODE","user_code":"ABCD-1234",
-                 "verification_uri":"https://github.com/login/device",
-                 "verification_uri_complete":"https://github.com/login/device?code=ABCD-1234",
-                 "expires_in":900,"interval":0}
-            """.trimIndent()
-            respond(exchange, body)
-        }
-        server.createContext("/login/oauth/access_token") { exchange ->
-            received.add(exchange.requestBody.readBytes().decodeToString())
-            val next = if (queue.isEmpty()) {
-                """{"error":"authorization_pending"}"""
-            } else {
-                queue.removeFirst()
-            }
-            respond(exchange, next)
-        }
-        server.start()
-        port = server.address.port
-    }
+    private fun json(text: String): JsonObject =
+        GitHubJson.parseToJsonElement(text) as JsonObject
 
-    @After
-    fun stopServer() {
-        server.stop(0)
-    }
+    private fun client() = DeviceFlowClient(clientId = "test-client", post = { _, body ->
+        sent.add(body)
+        if (replies.isEmpty()) json("""{"error":"authorization_pending"}""") else replies.removeFirst()
+    })
 
-    private fun respond(exchange: com.sun.net.httpserver.HttpExchange, body: String) {
-        val bytes = body.toByteArray()
-        exchange.responseHeaders.add("Content-Type", "application/json")
-        exchange.sendResponseHeaders(200, bytes.size.toLong())
-        exchange.responseBody.use { it.write(bytes) }
-    }
-
-    private fun client() = DeviceFlowClient(
-        clientId = "test-client",
-        deviceCodeUrl = "http://127.0.0.1:$port/login/device/code",
-        accessTokenUrl = "http://127.0.0.1:$port/login/oauth/access_token",
+    private fun code(expires: Int = 60, interval: Int = 0) = DeviceFlowClient.DeviceCode(
+        deviceCode = "DEV-CODE",
+        userCode = "ABCD-1234",
+        verificationUri = "https://github.com/login/device",
+        verificationUriComplete = null,
+        expiresInSeconds = expires,
+        intervalSeconds = interval,
     )
 
     @Test
     fun `requestCode returns the user code to show`() = runBlocking {
-        val code = client().requestCode()
-        assertEquals("ABCD-1234", code.userCode)
-        assertEquals("DEV-CODE", code.deviceCode)
-        assertEquals(900, code.expiresInSeconds)
+        replies.addLast(
+            json(
+                """{"device_code":"DEV-CODE","user_code":"ABCD-1234",
+                   "verification_uri":"https://github.com/login/device",
+                   "verification_uri_complete":"https://github.com/login/device?code=ABCD-1234",
+                   "expires_in":900,"interval":5}""",
+            ),
+        )
+        val result = client().requestCode()
+        assertEquals("ABCD-1234", result.userCode)
+        assertEquals("DEV-CODE", result.deviceCode)
+        assertEquals(900, result.expiresInSeconds)
+        assertEquals(5, result.intervalSeconds)
     }
 
     @Test
-    fun `awaitToken returns the token as soon as GitHub stops reporting an error`() {
-        // This is the regression: a body with no `error` field *is* the token.
-        queue.addLast(
-            """{"access_token":"ghu_token","token_type":"bearer",
-               "scope":"repo workflow","expires_in":28800,"refresh_token":"ghr_refresh"}""",
+    fun `awaitToken returns the token when the response carries no error field`() {
+        // The regression. A body with no `error` field *is* the token.
+        replies.addLast(
+            json(
+                """{"access_token":"ghu_token","token_type":"bearer",
+                   "scope":"repo workflow","expires_in":28800,"refresh_token":"ghr_refresh"}""",
+            ),
         )
 
-        val result = runBlocking {
-            client().awaitToken(
-                DeviceFlowClient.DeviceCode(
-                    deviceCode = "DEV-CODE",
-                    userCode = "ABCD-1234",
-                    verificationUri = "https://github.com/login/device",
-                    verificationUriComplete = null,
-                    expiresInSeconds = 60,
-                    intervalSeconds = 0,
-                ),
-            )
-        }
+        val result = runBlocking { client().awaitToken(code()) }
 
         assertEquals("ghu_token", result.accessToken)
         assertEquals("ghr_refresh", result.refreshToken)
@@ -106,57 +76,36 @@ class DeviceFlowClientTest {
     }
 
     @Test
-    fun `awaitToken keeps polling through authorization_pending then succeeds`() {
+    fun `awaitToken polls through pending and then returns the token`() {
         var ticks = 0
-        // Two pending responses, then the token.
-        queue.addLast("""{"error":"authorization_pending"}""")
-        queue.addLast(
-            """{"access_token":"ghu_after_two","token_type":"bearer","scope":"repo","expires_in":10}""",
-        )
+        replies.addLast(json("""{"error":"authorization_pending"}"""))
+        replies.addLast(json("""{"error":"authorization_pending"}"""))
+        replies.addLast(json("""{"access_token":"ghu_third","token_type":"bearer","expires_in":0}"""))
 
-        val result = runBlocking {
-            client().awaitToken(
-                DeviceFlowClient.DeviceCode(
-                    deviceCode = "DEV-CODE",
-                    userCode = "ABCD-1234",
-                    verificationUri = "",
-                    verificationUriComplete = null,
-                    expiresInSeconds = 60,
-                    intervalSeconds = 0,
-                ),
-                onTick = { ticks++ },
-            )
-        }
+        val result = runBlocking { client().awaitToken(code(), onTick = { ticks++ }) }
 
-        assertEquals("ghu_after_two", result.accessToken)
-        // One poll answers pending, the second returns the token.
-        assertEquals("expected exactly two polls, saw $ticks", 2, ticks)
+        assertEquals("ghu_third", result.accessToken)
+        assertEquals("expected three polls, saw $ticks", 3, ticks)
     }
 
     @Test
-    fun `the poll sends the device flow grant type`() {
-        queue.addLast("""{"access_token":"ghu_x","token_type":"bearer","scope":"","expires_in":0}""")
-        runBlocking {
-            client().awaitToken(
-                DeviceFlowClient.DeviceCode("DEV-CODE", "ABCD", "", null, 60, 0),
-            )
-        }
-        val body = received.first()
-        assertTrue(body, body.contains("urn:ietf:params:oauth:grant-type:device_code"))
-        assertTrue(body, body.contains("DEV-CODE"))
-        assertTrue(body, body.contains("test-client"))
+    fun `the poll sends the device flow grant type and the device code`() {
+        replies.addLast(json("""{"access_token":"ghu_x","token_type":"bearer","expires_in":0}"""))
+        runBlocking { client().awaitToken(code()) }
+
+        val body = sent.first()
+        assertEquals(
+            "urn:ietf:params:oauth:grant-type:device_code",
+            body["grant_type"]?.toString()?.trim('"'),
+        )
+        assertEquals("\"DEV-CODE\"", body["device_code"].toString())
+        assertEquals("\"test-client\"", body["client_id"].toString())
     }
 
     @Test
     fun `a declined authorisation surfaces as AuthorizationDenied`() {
-        queue.addLast("""{"error":"access_denied","error_description":"the user declined"}""")
-        val failure = runCatching {
-            runBlocking {
-                client().awaitToken(
-                    DeviceFlowClient.DeviceCode("DEV-CODE", "ABCD", "", null, 60, 0),
-                )
-            }
-        }
+        replies.addLast(json("""{"error":"access_denied","error_description":"the user declined"}"""))
+        val failure = runCatching { runBlocking { client().awaitToken(code()) } }
         assertTrue(
             "expected AuthorizationDenied, got ${failure.exceptionOrNull()}",
             failure.exceptionOrNull() is DeviceFlowClient.AuthorizationDenied,
@@ -165,17 +114,33 @@ class DeviceFlowClientTest {
 
     @Test
     fun `an expired device code surfaces as CodeExpired`() {
-        queue.addLast("""{"error":"expired_token","error_description":"code expired"}""")
+        replies.addLast(json("""{"error":"expired_token","error_description":"code expired"}"""))
+        val failure = runCatching { runBlocking { client().awaitToken(code()) } }
+        assertTrue(
+            "expected CodeExpired, got ${failure.exceptionOrNull()}",
+            failure.exceptionOrNull() is DeviceFlowClient.CodeExpired,
+        )
+    }
+
+    @Test
+    fun `polling stops with CodeExpired once the deadline passes`() {
+        // Every poll says pending, and the code's lifetime is already spent.
         val failure = runCatching {
-            runBlocking {
-                client().awaitToken(
-                    DeviceFlowClient.DeviceCode("DEV-CODE", "ABCD", "", null, 60, 0),
-                )
-            }
+            runBlocking { client().awaitToken(code(expires = 0)) }
         }
         assertTrue(
             "expected CodeExpired, got ${failure.exceptionOrNull()}",
             failure.exceptionOrNull() is DeviceFlowClient.CodeExpired,
         )
+    }
+
+    @Test
+    fun `refresh exchanges the refresh token for a new access token`() {
+        replies.addLast(
+            json("""{"access_token":"ghu_rotated","token_type":"bearer","expires_in":7200}"""),
+        )
+        val result = runBlocking { client().refresh("ghr_old") }
+        assertEquals("ghu_rotated", result.accessToken)
+        assertEquals("\"refresh_token\"", sent.first()["grant_type"].toString())
     }
 }
