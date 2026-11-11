@@ -54,13 +54,20 @@ jobs:
         run: gradle wrapper --gradle-version "$GRADLE_VERSION" --no-daemon
 
       - name: Render the screens
-        run: ./gradlew :app:updateDebugScreenshotTest --no-daemon --stacktrace
+        run: |
+          ./gradlew :app:updateDebugScreenshotTest --no-daemon --stacktrace
+          echo "--- rendered images ---"
+          find app -name "*.png" -newer app/build.gradle.kts 2>/dev/null | head -40
+          find app/build -type d -name "*roborazzi*" -o -type d -name "*screenshot*" 2>/dev/null | head -20
 
       - name: Upload the screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gitdroid-screenshots
-          path: app/build/outputs/roborazzi/
+          path: |
+            app/build/outputs/roborazzi/
+            app/build/reports/roborazzi/
+            app/build/screenshots/
           if-no-files-found: warn
           retention-days: 14
