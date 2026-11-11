@@ -1,7 +1,5 @@
 package dev.gitdroid.app.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,14 +30,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.gitdroid.app.core.api.CreateRepoRequest
 import dev.gitdroid.app.core.repo.GitRepository
 import dev.gitdroid.app.ui.components.GlassCard
-import dev.gitdroid.app.ui.components.MetaPill
 import dev.gitdroid.app.ui.theme.LocalGitDroidColors
 import dev.gitdroid.app.ui.theme.LocalSpace
 import dev.gitdroid.app.ui.theme.LocalType

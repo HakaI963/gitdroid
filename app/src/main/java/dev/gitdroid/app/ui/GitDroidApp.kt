@@ -31,6 +31,7 @@ import dev.gitdroid.app.core.auth.SessionState
 import dev.gitdroid.app.core.download.Downloader
 import dev.gitdroid.app.ui.screens.AuthScreen
 import dev.gitdroid.app.ui.screens.FileScreen
+import dev.gitdroid.app.ui.screens.IssueScreen
 import dev.gitdroid.app.ui.screens.McpScreen
 import dev.gitdroid.app.ui.screens.RepoDetailScreen
 import dev.gitdroid.app.ui.screens.ReposScreen
@@ -67,9 +68,12 @@ fun GitDroidApp(container: AppContainer) {
     val context = LocalContext.current
 
     val session by container.authManager.state.collectAsStateCompat()
+    val mcpPort by container.mcpPort.collectAsStateCompat()
+    val mcpRunning by container.mcpRunning.collectAsStateCompat()
     var destination by remember { mutableStateOf(TopLevelDestination.REPOS) }
     var repo by remember { mutableStateOf<Repository?>(null) }
     var filePath by remember { mutableStateOf<String?>(null) }
+    var issueNumber by remember { mutableStateOf<Int?>(null) }
     var showBack by remember { mutableStateOf(false) }
     var createRepoOpen by remember { mutableStateOf(false) }
 
@@ -124,6 +128,14 @@ fun GitDroidApp(container: AppContainer) {
                     .padding(it),
             ) {
                 when {
+                    issueNumber != null && repo != null -> IssueScreen(
+                        repository = container.repository,
+                        owner = repo!!.ownerLogin,
+                        repo = repo!!.name,
+                        number = issueNumber!!,
+                        onBack = { issueNumber = null },
+                    )
+
                     filePath != null && repo != null -> FileScreen(
                         repository = container.repository,
                         owner = repo!!.ownerLogin,
@@ -147,8 +159,8 @@ fun GitDroidApp(container: AppContainer) {
                             showBack = false
                         },
                         onOpenFile = { path -> filePath = path },
-                        onOpenIssue = { },
-                        onOpenPull = { },
+                        onOpenIssue = { number -> issueNumber = number },
+                        onOpenPull = { number -> issueNumber = number },
                         onOpenRun = { },
                     )
 
@@ -173,16 +185,16 @@ fun GitDroidApp(container: AppContainer) {
                     )
 
                     destination == TopLevelDestination.MCP -> McpScreen(
-                        port = container.mcpPort.value,
-                        running = container.mcpRunning.value,
+                        port = mcpPort,
+                        running = mcpRunning,
                         bearerToken = container.mcpToken(),
                         lanAddress = container.lanAddress(),
-                        toolCount = 28,
+                        toolCount = container.mcpToolCount,
                         onToggleServer = { enabled ->
                             if (enabled) {
-                                container.startMcpServer()
+                                container.enableMcp()
                             } else {
-                                container.stopMcpServer()
+                                container.disableMcp()
                             }
                         },
                         onRotateToken = {

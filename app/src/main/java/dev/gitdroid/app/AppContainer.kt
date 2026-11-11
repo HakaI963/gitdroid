@@ -7,6 +7,7 @@ import dev.gitdroid.app.core.auth.SecureStore
 import dev.gitdroid.app.core.cache.DiskCache
 import dev.gitdroid.app.core.repo.GitRepository
 import dev.gitdroid.app.mcp.McpServer
+import dev.gitdroid.app.mcp.McpService
 import dev.gitdroid.app.mcp.McpTools
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,7 +57,40 @@ class AppContainer(context: Context) {
     private val _mcpRunning = MutableStateFlow(false)
     val mcpRunning: StateFlow<Boolean> = _mcpRunning.asStateFlow()
 
-    /** Starts the MCP server and the foreground service that keeps it alive. */
+    /** How many tools the MCP server exposes. */
+    val mcpToolCount: Int get() = mcpTools.tools.size
+
+    /**
+     * Turns the MCP endpoint on.
+     *
+     * The foreground service is what keeps the process alive, so starting the
+     * server and starting the service are the same operation from the UI's
+     * point of view.
+     */
+    fun enableMcp() {
+        if (mcpServer?.isRunning != true) {
+            val server = McpServer(
+                tools = mcpTools,
+                scope = scope,
+                bearerToken = { secureStore.mcpToken },
+            )
+            val port = runCatching { server.start() }.getOrNull()
+            if (port != null) {
+                mcpServer = server
+                _mcpPort.value = port
+                _mcpRunning.value = true
+            }
+        }
+        McpService.start(appContext)
+    }
+
+    /** Turns the MCP endpoint off and stops the foreground service. */
+    fun disableMcp() {
+        McpService.stop(appContext)
+        stopMcpServer()
+    }
+
+    /** Starts the MCP server without touching the foreground service. */
     fun startMcpServer() {
         if (mcpServer?.isRunning == true) return
         val server = McpServer(
