@@ -1,0 +1,96 @@
+# Builds the GitDroid APK on GitHub-hosted runners.
+#
+# No local Gradle, Android SDK or NDK is ever needed: the workflow installs
+# the JDK and the Android SDK itself, generates the Gradle wrapper, and
+# uploads the resulting APK as a workflow artifact.
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Which build to produce'
+        type: choice
+        options: [debug, release, both]
+        default: release
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apk-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_VERSION: 8.13
+  JAVA_VERSION: '17'
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install the Android platform and build tools
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      # The wrapper is not tracked, so Gradle comes from the action above and
+      # the wrapper is generated from it before the build.
+      - name: Generate the Gradle wrapper
+        run: gradle wrapper --gradle-version "$GRADLE_VERSION" --no-daemon
+
+      - name: Build
+        run: |
+          case "${{ inputs.build_type }}" in
+            debug)   tasks=':app:assembleDebug' ;;
+            release) tasks=':app:assembleRelease' ;;
+            both)    tasks=':app:assembleDebug :app:assembleRelease' ;;
+            *)       tasks=':app:assembleRelease' ;;
+          esac
+          ./gradlew $tasks --no-daemon --stacktrace
+
+      - name: Upload the debug APK
+        if: always() && hashFiles('app/build/outputs/apk/debug/*.apk') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitdroid-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload the release APK
+        if: always() && hashFiles('app/build/outputs/apk/release/*.apk') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitdroid-release
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
+          retention-days: 30
