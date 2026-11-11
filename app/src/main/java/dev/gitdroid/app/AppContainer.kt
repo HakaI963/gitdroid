@@ -7,7 +7,6 @@ import dev.gitdroid.app.core.auth.SecureStore
 import dev.gitdroid.app.core.cache.DiskCache
 import dev.gitdroid.app.core.repo.GitRepository
 import dev.gitdroid.app.mcp.McpServer
-import dev.gitdroid.app.mcp.McpService
 import dev.gitdroid.app.mcp.McpTools
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

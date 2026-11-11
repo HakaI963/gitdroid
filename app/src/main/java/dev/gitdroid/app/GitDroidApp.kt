@@ -2,7 +2,6 @@ package dev.gitdroid.app
 
 import android.app.Application
 import dev.gitdroid.app.mcp.McpService
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**

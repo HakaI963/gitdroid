@@ -2,7 +2,6 @@ package dev.gitdroid.app.core.api
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -353,6 +352,12 @@ class GitHubApi(
         participating: Boolean = false,
     ): List<Notification> =
         get("notifications?all=$all&participating=$participating&per_page=50")
+
+    /**
+     * The HTTP client, so callers that need raw bytes (the downloader) can
+     * reuse the same warm connection pool instead of opening a new one.
+     */
+    fun httpClient(): OkHttpClient = client
 
     // ── Plumbing ────────────────────────────────────────────────────────────
 

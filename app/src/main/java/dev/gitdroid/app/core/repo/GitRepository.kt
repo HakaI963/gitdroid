@@ -21,12 +21,10 @@ import dev.gitdroid.app.core.api.WorkflowRun
 import dev.gitdroid.app.core.api.WorkflowDispatchRequest
 import dev.gitdroid.app.core.cache.DiskCache
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * The in-memory view of the user's GitHub workspace.
