@@ -48,9 +48,9 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
-      - name: Set up the Android SDK
-        uses: android-actions/setup-android@v3
-
+      # The ubuntu runner image already ships the Android SDK and the
+      # command-line tools, so there is nothing to install — only the
+      # platform and build-tools this project compiles against.
       - name: Install the Android platform and build tools
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
