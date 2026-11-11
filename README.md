@@ -13,7 +13,7 @@ can drive the GitHub account that is signed in on the phone.
 
 | Repositories | The MCP dashboard |
 |---|---|
-| ![Repositories](docs/screenshots/01-repos-dark.png) | ![MCP](docs/screenshots/03-mcp-dark.png) |
+| ![Repositories](docs/screenshots/07-shell-dark.png) | ![MCP](docs/screenshots/03-mcp-dark.png) |
 
 ---
 
