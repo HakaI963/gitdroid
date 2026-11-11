@@ -28,6 +28,7 @@ class GitDroidApp : Application() {
                 }
                 container.repository.loadBranchSelection()
                 container.repository.loadRepos()
+                container.inbox.start()
             }
         }
 

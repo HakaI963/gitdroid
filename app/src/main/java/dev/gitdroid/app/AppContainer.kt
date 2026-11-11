@@ -49,6 +49,12 @@ class AppContainer(context: Context) {
         scope = scope,
     )
 
+    val inbox = dev.gitdroid.app.core.repo.Inbox(
+        api = api,
+        cache = diskCache,
+        scope = scope,
+    )
+
     private val mcpTools = McpTools(api)
 
     private var mcpServer: McpServer? = null

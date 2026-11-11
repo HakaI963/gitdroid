@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cable
+import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
@@ -51,6 +52,7 @@ import dev.gitdroid.app.ui.components.StatusDot
 import dev.gitdroid.app.ui.screens.AuthScreen
 import dev.gitdroid.app.ui.screens.CreateRepoSheet
 import dev.gitdroid.app.ui.screens.FileScreen
+import dev.gitdroid.app.ui.screens.InboxScreen
 import dev.gitdroid.app.ui.screens.IssueScreen
 import dev.gitdroid.app.ui.screens.McpScreen
 import dev.gitdroid.app.ui.screens.RepoDetailScreen
@@ -66,6 +68,7 @@ import kotlinx.coroutines.launch
 
 /** The top-level destinations. */
 enum class TopLevelDestination(val label: String) {
+    INBOX("Inbox"),
     REPOS("Repos"),
     SEARCH("Search"),
     MCP("MCP"),
@@ -98,7 +101,7 @@ fun GitDroidApp(
     val mcpRunning by container.mcpRunning.collectAsStateCompat()
     val refreshing by container.repository.reposRefreshing.collectAsStateCompat()
 
-    var destination by remember { mutableStateOf(TopLevelDestination.REPOS) }
+    var destination by remember { mutableStateOf(TopLevelDestination.INBOX) }
     var repo by remember { mutableStateOf<Repository?>(null) }
     var filePath by remember { mutableStateOf<String?>(null) }
     var issueNumber by remember { mutableStateOf<Int?>(null) }
@@ -167,6 +170,7 @@ fun GitDroidApp(
                             icon = {
                                 Icon(
                                     imageVector = when (entry) {
+                                        TopLevelDestination.INBOX -> Icons.Rounded.Inbox
                                         TopLevelDestination.REPOS -> Icons.Rounded.Hub
                                         TopLevelDestination.SEARCH -> Icons.Rounded.Search
                                         TopLevelDestination.MCP -> Icons.Rounded.Cable
@@ -240,6 +244,15 @@ fun GitDroidApp(
                             onOpenIssue = { number -> issueNumber = number },
                             onOpenPull = { number -> issueNumber = number },
                             onOpenRun = { id -> runId = id },
+                        )
+
+                        destination == TopLevelDestination.INBOX -> InboxScreen(
+                            inbox = container.inbox,
+                            onOpenRepo = { fullName ->
+                                container.repository.repos.value
+                                    .firstOrNull { it.fullName == fullName }
+                                    ?.let { repo = it }
+                            },
                         )
 
                         destination == TopLevelDestination.REPOS -> ReposScreen(
