@@ -19,8 +19,8 @@ import dev.gitdroid.app.ui.theme.GitDroidTheme
 import dev.gitdroid.app.ui.theme.ThemeMode
 import org.junit.Rule
 import org.junit.Test
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
@@ -34,7 +34,7 @@ import java.io.File
  *
  * The images land in `app/build/screenshots/`.
  */
-@RunWith(RobolectricTestRunner::class)
+@RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-xhdpi")
 class ScreenshotTest {
