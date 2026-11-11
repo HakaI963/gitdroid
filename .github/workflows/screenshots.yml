@@ -55,7 +55,10 @@ jobs:
 
       - name: Render the screens
         run: |
-          ./gradlew :app:testDebugUnitTest --tests '*ScreenshotTest*' --no-daemon --stacktrace
+          rm -rf app/build/screenshots
+          # The task has to actually run: a cached result restores the task
+          # outcome but not the PNG files it wrote.
+          ./gradlew :app:testDebugUnitTest --tests '*ScreenshotTest*' --no-daemon --stacktrace --rerun-tasks
           echo "--- rendered images ---"
           find app -name '*.png' -newer app/build.gradle.kts 2>/dev/null | sort | head -30
           echo '--- png anywhere under app/build ---'
