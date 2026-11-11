@@ -66,8 +66,7 @@ jobs:
         with:
           name: gitdroid-screenshots
           path: |
-            app/build/outputs/roborazzi/
-            app/build/reports/roborazzi/
-            app/build/screenshots/
+            app/build/outputs/screenshotTest-results/
+            app/build/reports/
           if-no-files-found: warn
           retention-days: 14
