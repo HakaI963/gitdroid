@@ -23,6 +23,9 @@ class GitDroidApp : Application() {
             runCatching {
                 container.authManager.restore()
                 container.repository.loadPinned()
+                if (container.authManager.isSignedIn) {
+                    container.repository.loadStarred()
+                }
                 container.repository.loadBranchSelection()
                 container.repository.loadRepos()
             }

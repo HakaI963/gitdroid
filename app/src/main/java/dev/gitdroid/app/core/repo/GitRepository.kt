@@ -70,6 +70,10 @@ class GitRepository(
     private val _pinnedRepos = MutableStateFlow<Set<String>>(emptySet())
     val pinnedRepos: StateFlow<Set<String>> = _pinnedRepos.asStateFlow()
 
+    /** The repos the signed-in user has starred on GitHub. */
+    private val _starredRepos = MutableStateFlow<Set<String>>(emptySet())
+    val starredRepos: StateFlow<Set<String>> = _starredRepos.asStateFlow()
+
     /** The branch selected per repo, remembered across sessions. */
     private val _branchSelection = MutableStateFlow<Map<String, String>>(emptyMap())
     val branchSelection: StateFlow<Map<String, String>> = _branchSelection.asStateFlow()
@@ -141,6 +145,23 @@ class GitRepository(
         }
     }
 
+    /**
+     * Loads the repos the user has starred on GitHub.
+     *
+     * Without this the star button would have no idea what the current
+     * state is, and the first tap would always try to star a repo the user
+     * had already starred.
+     */
+    fun loadStarred() {
+        scope.launch {
+            val login = api.currentUser().login
+            runCatching { api.listStarredRepos(login, perPage = 100) }
+                .onSuccess { response ->
+                    _starredRepos.value = response.body.map { it.fullName }.toSet()
+                }
+        }
+    }
+
     /** Remembers the selected branch for a repo. */
     fun selectBranch(fullName: String, branch: String) {
         _branchSelection.value = _branchSelection.value + (fullName to branch)
@@ -190,20 +211,25 @@ class GitRepository(
         cache.write(KEY_REPOS, _repos.value)
     }
 
-    /** Toggles the star on a repo. */
+    /**
+     * Toggles the star on a repo.
+     *
+     * Returns the new state: `true` when the repo is now starred.
+     */
     suspend fun toggleStar(repo: Repository): Result<Boolean> = runCatching {
-        val starred = repo.stargazersCount > 0 && _starredByMe.contains(repo.fullName)
-        if (starred) {
+        val wasStarred = _starredRepos.value.contains(repo.fullName)
+        if (wasStarred) {
             api.unstarRepository(repo.ownerLogin, repo.name)
-            _starredByMe.remove(repo.fullName)
+            _starredRepos.value = _starredRepos.value - repo.fullName
         } else {
             api.starRepository(repo.ownerLogin, repo.name)
-            _starredByMe.add(repo.fullName)
+            _starredRepos.value = _starredRepos.value + repo.fullName
         }
-        !starred
+        !wasStarred
     }
 
-    private val _starredByMe = mutableSetOf<String>()
+    /** Whether the signed-in user has starred this repo. */
+    fun isStarred(fullName: String): Boolean = _starredRepos.value.contains(fullName)
 
     /** Forks a repository. */
     suspend fun forkRepo(owner: String, repo: String): Result<Repository> =

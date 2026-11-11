@@ -247,9 +247,7 @@ fun GitDroidApp(
                                 container.disableMcp()
                             }
                         },
-                        onRotateToken = {
-                            container.secureStore.mcpToken = dev.gitdroid.app.core.auth.SecureStore.randomToken()
-                        },
+                        onRotateToken = { container.rotateMcpToken() },
                     )
                 }
             }

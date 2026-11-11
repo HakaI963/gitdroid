@@ -101,6 +101,13 @@ android {
         systemProperty("robolectric.pixelCopyRenderMode", "hardware")
         systemProperty("roborazzi.test.record", "true")
         systemProperty("roborazzi.record.filePathStrategy", "relativePathFromRoborazziContextOutputDirectory")
+
+        // The screenshot test pulls down Robolectric's android-all jars, so
+        // it runs in its own workflow (screenshots.yml) rather than slowing
+        // every APK build. Pass -Pgitdroid.screenshots to include it.
+        if (!project.hasProperty("gitdroid.screenshots")) {
+            exclude("**/screenshot/**")
+        }
     }
 }
 

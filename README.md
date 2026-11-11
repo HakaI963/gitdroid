@@ -11,6 +11,10 @@ can drive the GitHub account that is signed in on the phone.
   <em>Repositories · code · issues · pull requests · Actions · releases · search · downloads · an MCP server for your agents</em>
 </p>
 
+| Repositories | The MCP dashboard |
+|---|---|
+| ![Repositories](docs/screenshots/01-repos-dark.png) | ![MCP](docs/screenshots/03-mcp-dark.png) |
+
 ---
 
 ## Why another GitHub app
@@ -188,6 +192,14 @@ The requested scope is `repo workflow read:org`.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the app is put together
 - [docs/MCP.md](docs/MCP.md) — the MCP server, its tools and its transports
 - [docs/AGENTS.md](docs/AGENTS.md) — how to work on this repository
+- [integrations/README.md](integrations/README.md) — connecting every agent
+- [docs/screenshots/](docs/screenshots/) — the rendered screens
+
+## Screens
+
+| Issues | Actions |
+|---|---|
+| ![Issues](docs/screenshots/05-issues-dark.png) | ![Actions](docs/screenshots/06-actions-dark.png) |
 
 ## License
 

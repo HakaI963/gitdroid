@@ -129,14 +129,29 @@ class AppContainer(context: Context) {
         _mcpRunning.value = false
     }
 
-    /** The bearer token an agent must send, generating one on first use. */
+    /**
+     * The bearer token an agent must send, generating one on first use.
+     *
+     * It is read once and kept in memory: the MCP screen asks for it on every
+     * recomposition, and a keystore round trip does not belong there.
+     */
     fun mcpToken(): String {
-        val existing = secureStore.mcpToken
-        if (!existing.isNullOrBlank()) return existing
-        val generated = SecureStore.randomToken()
-        secureStore.mcpToken = generated
-        return generated
+        cachedToken?.let { return it }
+        val token = secureStore.mcpToken?.takeIf { it.isNotBlank() }
+            ?: SecureStore.randomToken().also { secureStore.mcpToken = it }
+        cachedToken = token
+        return token
     }
+
+    /** Replaces the bearer token, invalidating every client that had the old one. */
+    fun rotateMcpToken(): String {
+        val token = SecureStore.randomToken()
+        secureStore.mcpToken = token
+        cachedToken = token
+        return token
+    }
+
+    private var cachedToken: String? = null
 
     /** The LAN address an agent on the same network can reach. */
     fun lanAddress(): String {
