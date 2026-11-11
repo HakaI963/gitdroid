@@ -473,14 +473,27 @@ class GitRepository(
     /**
      * Reads a file's text.
      *
-     * The Contents API base64-encodes file bodies; this decodes them.
+     * The Contents API base64-encodes file bodies; this decodes them. Files
+     * over 1 MB are refused by that endpoint, so the blob API is used as a
+     * fallback rather than reporting the file as unopenable.
      */
     suspend fun readFile(owner: String, repo: String, path: String, ref: String?): FileContent? =
         runCatching {
-            val element = api.contents(owner, repo, path, ref)
+            val element = try {
+                api.contents(owner, repo, path, ref)
+            } catch (e: GitHubException) {
+                // A 403 here means "too large for the Contents API", not
+                // "forbidden" — go round it through the blob endpoint.
+                if (e.status == 403 || e.status == 404) {
+                    return readViaBlob(owner, repo, path, ref)
+                }
+                throw e
+            }
             val obj = dev.gitdroid.app.core.api.Json.obj(element) ?: return null
             val type = dev.gitdroid.app.core.api.Json.string(obj["type"])
             if (type == "dir") return null
+            // A symlink is a blob whose content is the target path.
+            if (type == "symlink") return readViaBlob(owner, repo, path, ref)
             val encoding = dev.gitdroid.app.core.api.Json.string(obj["encoding"])
             val content = dev.gitdroid.app.core.api.Json.string(obj["content"]).orEmpty()
             val decoded = if (encoding == "base64") {
@@ -500,6 +513,34 @@ class GitRepository(
                 isBinary = !isProbablyText(decoded),
             )
         }.getOrNull()
+
+    /** Reads a file through the git blob API, for anything the Contents API refuses. */
+    private suspend fun readViaBlob(
+        owner: String,
+        repo: String,
+        path: String,
+        ref: String?,
+    ): FileContent? {
+        val entries = listDirectory(owner, repo, path.substringBeforeLast('/'), ref)
+        val name = path.substringAfterLast('/')
+        val entry = entries.firstOrNull { it.name == name } ?: return null
+        if (entry.isDirectory) return null
+        val blob = api.blob(owner, repo, entry.sha)
+        val decoded = runCatching {
+            java.util.Base64.getMimeDecoder().decode(blob.content).toString(Charsets.UTF_8)
+        }.getOrElse { blob.content }
+        return FileContent(
+            path = path,
+            name = name,
+            sha = blob.sha,
+            size = blob.size,
+            encoding = blob.encoding,
+            content = decoded,
+            downloadUrl = "",
+            htmlUrl = "",
+            isBinary = !isProbablyText(decoded),
+        )
+    }
 
     /** Writes a file, creating it when it does not exist yet. */
     suspend fun writeFile(

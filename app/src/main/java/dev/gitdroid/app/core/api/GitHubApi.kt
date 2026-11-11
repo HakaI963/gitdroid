@@ -158,6 +158,16 @@ class GitHubApi(
         return getElement("repos/$owner/$repo/contents/$encoded$query")
     }
 
+    /**
+     * Reads a blob directly by SHA.
+     *
+     * The Contents API refuses files over 1 MB, so this is the fallback that
+     * makes "open anything from a repo" actually true. Blobs come back base64
+     * and without a path, which the caller fills in.
+     */
+    suspend fun blob(owner: String, repo: String, sha: String): GitBlob =
+        get("repos/$owner/$repo/git/blobs/$sha")
+
     suspend fun tree(owner: String, repo: String, sha: String, recursive: Boolean = true): GitTree =
         get("repos/$owner/$repo/git/trees/$sha?recursive=$recursive")
 

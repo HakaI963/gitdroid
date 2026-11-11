@@ -21,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Save
@@ -188,6 +190,12 @@ fun FileScreen(
 
             isImage -> ImageContent(
                 file = file!!,
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            file!!.isBinary -> BinaryContent(
+                file = file!!,
+                onDownload = { onDownload(file!!) },
                 modifier = Modifier.fillMaxSize(),
             )
 
@@ -447,3 +455,55 @@ private fun EditSheet(
 
 /** The file extensions the viewer treats as images. */
 val IMAGE_EXTENSIONS = listOf(".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg")
+
+/**
+ * A file that is not text and not an image.
+ *
+ * GitHub shows "this file is binary, download it" rather than a wall of
+ * replacement characters, and so does this.
+ */
+@Composable
+private fun BinaryContent(
+    file: FileContent,
+    onDownload: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val space = LocalSpace.current
+    val type = LocalType.current
+    val colors = LocalGitDroidColors.current
+
+    Column(
+        modifier = modifier.padding(space.xxl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Description,
+            contentDescription = null,
+            modifier = Modifier.size(34.dp),
+            tint = colors.textTertiary,
+        )
+        Spacer(Modifier.height(space.md))
+        Text(
+            text = "Binary file",
+            style = type.title,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(space.xs))
+        Text(
+            text = "${file.name} · ${formatBytes(file.size)}",
+            style = type.codeSmall,
+            color = colors.textTertiary,
+        )
+        Spacer(Modifier.height(space.lg))
+        Button(onClick = onDownload) {
+            Icon(
+                imageVector = Icons.Rounded.Download,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(space.sm))
+            Text("Download", style = type.label)
+        }
+    }
+}

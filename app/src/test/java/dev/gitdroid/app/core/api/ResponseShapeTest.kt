@@ -101,6 +101,21 @@ class ResponseShapeTest {
     }
 
     @Test
+    fun `a blob is decoded from base64 for files the contents api refuses`() = runBlocking {
+        // GitHub answers the Contents API with 403 "too large" past 1 MB; the
+        // blob endpoint is the way round, and it base64s the body.
+        val payload = "hello from a big file"
+        val encoded = java.util.Base64.getEncoder().encodeToString(payload.toByteArray())
+        val body = "{\"sha\":\"b1\",\"url\":\"https://api.github.com/x\"," +
+            "\"content\":\"$encoded\",\"encoding\":\"base64\",\"size\":1500000}"
+        val a = api(body)
+        val blob = a.blob("o", "r", "b1")
+        assertEquals("b1", blob.sha)
+        assertEquals(1500000L, blob.size)
+        assertEquals(payload, java.util.Base64.getMimeDecoder().decode(blob.content).toString(Charsets.UTF_8))
+    }
+
+    @Test
     fun `a bare array still decodes where GitHub returns one`() = runBlocking {
         val a = api("""[{"name":"main","commit":{"sha":"abc123"}},{"name":"dev","commit":{"sha":"def"}}]""")
         val branches = a.listBranches("o", "r")
