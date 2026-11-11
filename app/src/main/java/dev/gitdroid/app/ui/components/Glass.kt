@@ -32,8 +32,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -83,6 +85,17 @@ fun GlassCard(
             .scale(scale)
             .clip(shape ?: MaterialTheme.shapes.medium)
             .background(fill)
+            // A hairline top edge catches the light and gives the card a
+            // physical edge, the way a sheet of paper catches a window.
+            .drawWithContent {
+                drawContent()
+                drawLine(
+                    color = Color.White.copy(alpha = 0.05f),
+                    start = Offset(0f, 0.5f),
+                    end = Offset(size.width, 0.5f),
+                    strokeWidth = 1f,
+                )
+            }
             .border(BorderStroke(1.dp, stroke), shape ?: MaterialTheme.shapes.medium)
             .then(
                 if (onClick != null) {

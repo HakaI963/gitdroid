@@ -1,5 +1,6 @@
 package dev.gitdroid.app.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,7 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CallSplit
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -89,7 +93,10 @@ fun RepoRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(space.xs))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(space.md),
+                ) {
                     if (repo.language != null) {
                         StatusDot(color = languageColor(repo.language))
                         Spacer(Modifier.width(space.xs))
@@ -98,30 +105,60 @@ fun RepoRow(
                             style = type.labelSmall,
                             color = colors.textTertiary,
                         )
-                        Spacer(Modifier.width(space.md))
                     }
-                    Text(
-                        text = "★ ${repo.stargazersCount}",
-                        style = type.labelSmall,
-                        color = colors.textTertiary,
+                    MetaStat(
+                        icon = Icons.Rounded.Star,
+                        count = repo.stargazersCount,
                     )
-                    Spacer(Modifier.width(space.md))
-                    Text(
-                        text = "⑂ ${repo.forksCount}",
-                        style = type.labelSmall,
-                        color = colors.textTertiary,
+                    MetaStat(
+                        icon = Icons.Rounded.CallSplit,
+                        count = repo.forksCount,
                     )
                     if (repo.openIssuesCount > 0) {
-                        Spacer(Modifier.width(space.md))
-                        Text(
-                            text = "● ${repo.openIssuesCount}",
-                            style = type.labelSmall,
-                            color = colors.textTertiary,
+                        MetaStat(
+                            icon = Icons.Rounded.ErrorOutline,
+                            count = repo.openIssuesCount,
                         )
                     }
                 }
             }
             trailing?.invoke()
         }
+    }
+}
+
+/**
+ * A count with its glyph.
+ *
+ * The icon carries the meaning and the number carries the magnitude, so the
+ * row stays scannable — an icon alone needs a label, and a number alone
+ * needs a legend.
+ */
+@Composable
+private fun MetaStat(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
+    val space = LocalSpace.current
+    val type = LocalType.current
+    val colors = LocalGitDroidColors.current
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(12.dp),
+            tint = colors.textTertiary,
+        )
+        Spacer(Modifier.width(3.dp))
+        Text(
+            text = count.toString(),
+            style = type.labelSmall,
+            color = colors.textTertiary,
+        )
     }
 }
