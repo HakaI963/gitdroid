@@ -62,6 +62,18 @@ class McpToolsTest {
     }
 
     @Test
+    fun `every advertised tool can actually be dispatched`() {
+        // The registry and the dispatcher are two lists that can drift apart:
+        // a tool that is advertised but not implemented would answer every
+        // call with "Unknown tool", which is the worst possible failure for
+        // an agent.
+        val advertised = tools().tools.map { it.name }.toSet()
+        val dispatched = tools().dispatchableNames()
+        assertEquals("advertised but not implemented", emptySet<String>(), advertised - dispatched)
+        assertEquals("implemented but not advertised", emptySet<String>(), dispatched - advertised)
+    }
+
+    @Test
     fun `the tool registry exposes the official GitHub MCP names`() {
         val names = tools().tools.map { it.name }.toSet()
         val expected = setOf(

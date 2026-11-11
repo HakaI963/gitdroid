@@ -484,38 +484,52 @@ class McpTools(
         errorResult(e.message ?: "The tool failed")
     }
 
+    /**
+     * The tools this server can actually run, keyed by name.
+     *
+     * A map rather than a `when` so the registry and the implementation are
+     * checked against each other by construction — a tool that is advertised
+     * but not wired up is the worst failure an MCP server can have, because
+     * every call to it looks like a typo in the agent's prompt.
+     */
+    private val handlers: Map<String, suspend (JsonObject) -> CallToolResult> by lazy {
+        mapOf(
+            "search_repositories" to ::searchRepositories,
+            "search_code" to ::searchCode,
+            "get_file_contents" to ::getFileContents,
+            "create_or_update_file" to ::createOrUpdateFile,
+            "delete_file" to ::deleteFile,
+            "list_repositories" to ::listRepositories,
+            "get_repository" to ::getRepository,
+            "create_repository" to ::createRepository,
+            "update_repository" to ::updateRepository,
+            "delete_repository" to ::deleteRepository,
+            "fork_repository" to ::forkRepository,
+            "list_branches" to ::listBranches,
+            "create_branch" to ::createBranch,
+            "list_commits" to ::listCommits,
+            "list_issues" to ::listIssues,
+            "create_issue" to ::createIssue,
+            "update_issue" to ::updateIssue,
+            "list_pull_requests" to ::listPullRequests,
+            "create_pull_request" to ::createPullRequest,
+            "merge_pull_request" to ::mergePullRequest,
+            "list_workflows" to ::listWorkflows,
+            "list_workflow_runs" to ::listWorkflowRuns,
+            "rerun_workflow" to ::rerunWorkflow,
+            "cancel_workflow_run" to ::cancelWorkflowRun,
+            "dispatch_workflow" to ::dispatchWorkflow,
+            "list_releases" to ::listReleases,
+            "list_tags" to ::listTags,
+            "get_repository_tree" to ::getRepositoryTree,
+        )
+    }
+
+    /** The names this server can dispatch — used by the drift test. */
+    fun dispatchableNames(): Set<String> = handlers.keys
+
     private suspend fun dispatch(name: String, arguments: JsonObject): CallToolResult =
-        when (name) {
-            "search_repositories" -> searchRepositories(arguments)
-            "search_code" -> searchCode(arguments)
-            "get_file_contents" -> getFileContents(arguments)
-            "create_or_update_file" -> createOrUpdateFile(arguments)
-            "delete_file" -> deleteFile(arguments)
-            "list_repositories" -> listRepositories(arguments)
-            "get_repository" -> getRepository(arguments)
-            "create_repository" -> createRepository(arguments)
-            "update_repository" -> updateRepository(arguments)
-            "delete_repository" -> deleteRepository(arguments)
-            "fork_repository" -> forkRepository(arguments)
-            "list_branches" -> listBranches(arguments)
-            "create_branch" -> createBranch(arguments)
-            "list_commits" -> listCommits(arguments)
-            "list_issues" -> listIssues(arguments)
-            "create_issue" -> createIssue(arguments)
-            "update_issue" -> updateIssue(arguments)
-            "list_pull_requests" -> listPullRequests(arguments)
-            "create_pull_request" -> createPullRequest(arguments)
-            "merge_pull_request" -> mergePullRequest(arguments)
-            "list_workflows" -> listWorkflows(arguments)
-            "list_workflow_runs" -> listWorkflowRuns(arguments)
-            "rerun_workflow" -> rerunWorkflow(arguments)
-            "cancel_workflow_run" -> cancelWorkflowRun(arguments)
-            "dispatch_workflow" -> dispatchWorkflow(arguments)
-            "list_releases" -> listReleases(arguments)
-            "list_tags" -> listTags(arguments)
-            "get_repository_tree" -> getRepositoryTree(arguments)
-            else -> errorResult("Unknown tool: $name")
-        }
+        handlers[name]?.invoke(arguments) ?: errorResult("Unknown tool: $name")
 
     // ── Implementations ─────────────────────────────────────────────────────
 
