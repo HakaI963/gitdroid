@@ -377,9 +377,14 @@ class GitRepository(
 
     // ── Actions ─────────────────────────────────────────────────────────────
 
-    /** Lists the workflows defined in a repo. */
+    /**
+     * Lists the workflow files in a repo.
+     *
+     * Failures are re-thrown rather than swallowed into an empty list: an
+     * empty Actions tab should say why, not just look empty.
+     */
     suspend fun workflows(owner: String, repo: String): List<Workflow> =
-        runCatching { api.listWorkflows(owner, repo) }.getOrElse { emptyList() }
+        api.listWorkflows(owner, repo)
 
     /** Lists workflow runs. */
     /** The runs of a repo, newest first, falling back to the cache. */
@@ -387,10 +392,11 @@ class GitRepository(
         owner: String,
         repo: String,
         workflowId: String? = null,
+        status: String? = null,
     ): List<WorkflowRun> {
-        val key = "runs:$owner/$repo:${workflowId ?: "all"}"
+        val key = "runs:$owner/$repo:${workflowId ?: "all"}:${status ?: "any"}"
         return runCatching {
-            val runs = api.listWorkflowRuns(owner, repo, workflowId)
+            val runs = api.listWorkflowRuns(owner, repo, workflowId, status)
             cache.write(key, runs)
             runs
         }.getOrElse {

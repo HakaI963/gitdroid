@@ -179,6 +179,7 @@ fun RepoDetailScreen(
                 RepoTab.ACTIONS -> ActionsTab(
                     repository = repository,
                     repo = repo,
+                    branch = currentBranch,
                     onOpenRun = onOpenRun,
                 )
 
@@ -510,118 +511,6 @@ private fun PullsTab(
                         MetaPill(text = "+${pull.additions}", color = colors.success)
                         MetaPill(text = "−${pull.deletions}", color = colors.danger)
                     }
-                }
-            }
-        }
-    }
-}
-
-// ── Actions tab ─────────────────────────────────────────────────────────────
-
-@Composable
-private fun ActionsTab(
-    repository: GitRepository,
-    repo: Repository,
-    onOpenRun: (Long) -> Unit,
-) {
-    val space = LocalSpace.current
-    val type = LocalType.current
-    val colors = LocalGitDroidColors.current
-    val scope = rememberCoroutineScope()
-
-    var runs by remember { mutableStateOf<List<WorkflowRun>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var busy by remember { mutableStateOf(false) }
-
-    LaunchedEffect(repo.fullName) {
-        loading = true
-        runs = repository.workflowRuns(repo.ownerLogin, repo.name)
-        loading = false
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = space.gutter,
-            end = space.gutter,
-            bottom = space.xxxl,
-        ),
-        verticalArrangement = Arrangement.spacedBy(space.rowGap),
-    ) {
-        item(key = "actions-header") {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Workflow runs",
-                    style = type.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(
-                    onClick = {
-                        scope.launch {
-                            busy = true
-                            runs = repository.workflowRuns(repo.ownerLogin, repo.name)
-                            busy = false
-                        }
-                    },
-                    enabled = !busy,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Refresh,
-                        contentDescription = "Refresh runs",
-                        modifier = Modifier.size(18.dp),
-                        tint = colors.textTertiary,
-                    )
-                }
-            }
-        }
-
-        if (!loading && runs.isEmpty()) {
-            item(key = "empty") {
-                EmptyState(
-                    icon = Icons.Rounded.BugReport,
-                    title = "No runs yet",
-                    message = "This repository has no Actions workflow runs.",
-                )
-            }
-        }
-
-        items(runs, key = { it.id }) { run ->
-            GlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                onClick = { onOpenRun(run.id) },
-            ) {
-                Column(Modifier.padding(space.md)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RunStatusIcon(
-                            status = run.status,
-                            conclusion = run.conclusion,
-                        )
-                        Spacer(Modifier.width(space.sm))
-                        Text(
-                            text = run.name.ifBlank { "Workflow run" },
-                            style = type.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            text = "#${run.runNumber}",
-                            style = type.labelSmall,
-                            color = colors.textTertiary,
-                        )
-                    }
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "${run.headBranch} · ${run.event}",
-                        style = type.bodySmall,
-                        color = colors.textTertiary,
-                    )
                 }
             }
         }
