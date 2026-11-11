@@ -1,0 +1,66 @@
+# Renders the Compose screens to PNGs so the design can be reviewed.
+#
+# The screenshots come out of Robolectric, which draws the real Compose UI on
+# the JVM — no device and no emulator needed.
+name: Screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'app/src/main/java/dev/gitdroid/app/ui/**'
+      - 'app/src/screenshotTest/**'
+      - 'app/build.gradle.kts'
+      - 'gradle/libs.versions.toml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_VERSION: 8.13
+  JAVA_VERSION: '17'
+
+jobs:
+  render:
+    name: Render screenshots
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install the Android platform and build tools
+        run: |
+          SDKMANAGER="$(dirname "$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -1)")/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+
+      - name: Generate the Gradle wrapper
+        run: gradle wrapper --gradle-version "$GRADLE_VERSION" --no-daemon
+
+      - name: Render the screens
+        run: ./gradlew :app:updateDebugScreenshotTest --no-daemon --stacktrace
+
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitdroid-screenshots
+          path: app/build/outputs/roborazzi/
+          if-no-files-found: warn
+          retention-days: 14

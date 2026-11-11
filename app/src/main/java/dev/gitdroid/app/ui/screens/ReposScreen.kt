@@ -208,11 +208,20 @@ fun ReposScreen(
             if (recentRepos.isNotEmpty() && query.isBlank()) {
                 item(key = "recent-header") { SectionHeader("Recent") }
                 items(recentRepos, key = { "recent-${it.id}" }) { repo ->
-                    RepoRow(
+                    dev.gitdroid.app.ui.components.RepoRow(
                         repo = repo,
                         modifier = Modifier.padding(horizontal = space.gutter),
                         onClick = { onOpenRepo(repo) },
-                        onMenu = { menuFor = repo },
+                        trailing = {
+                            IconButton(onClick = { menuFor = repo }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.MoreVert,
+                                    contentDescription = "Repository actions",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = colors.textTertiary,
+                                )
+                            }
+                        },
                     )
                 }
             }
@@ -245,11 +254,20 @@ fun ReposScreen(
             }
 
             items(filtered, key = { it.id }) { repo ->
-                RepoRow(
+                dev.gitdroid.app.ui.components.RepoRow(
                     repo = repo,
                     modifier = Modifier.padding(horizontal = space.gutter),
                     onClick = { onOpenRepo(repo) },
-                    onMenu = { menuFor = repo },
+                    trailing = {
+                        IconButton(onClick = { menuFor = repo }) {
+                            Icon(
+                                imageVector = Icons.Rounded.MoreVert,
+                                contentDescription = "Repository actions",
+                                modifier = Modifier.size(18.dp),
+                                tint = colors.textTertiary,
+                            )
+                        }
+                    },
                 )
             }
         }
@@ -365,109 +383,6 @@ private fun PinnedRepoCard(
                     text = "★ ${repo.stargazersCount}",
                     style = type.labelSmall,
                     color = colors.textTertiary,
-                )
-            }
-        }
-    }
-}
-
-/** One repository, rendered as a dense row. */
-@Composable
-private fun RepoRow(
-    repo: Repository,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-    onMenu: () -> Unit,
-) {
-    val space = LocalSpace.current
-    val type = LocalType.current
-    val colors = LocalGitDroidColors.current
-
-    GlassCard(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        onClick = onClick,
-    ) {
-        Row(
-            modifier = Modifier.padding(
-                start = space.md,
-                end = space.xs,
-                top = space.md,
-                bottom = space.md,
-            ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = repo.name,
-                        style = type.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    if (repo.isPrivate) {
-                        Spacer(Modifier.width(space.xs))
-                        Icon(
-                            imageVector = Icons.Rounded.Lock,
-                            contentDescription = "Private",
-                            modifier = Modifier.size(13.dp),
-                            tint = colors.textTertiary,
-                        )
-                    }
-                    if (repo.archived) {
-                        Spacer(Modifier.width(space.xs))
-                        MetaPill(text = "Archived", color = colors.warning)
-                    }
-                }
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = repo.description ?: repo.ownerLogin,
-                    style = type.bodySmall,
-                    color = colors.textTertiary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(space.xs))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (repo.language != null) {
-                        StatusDot(color = languageColor(repo.language))
-                        Spacer(Modifier.width(space.xs))
-                        Text(
-                            text = repo.language,
-                            style = type.labelSmall,
-                            color = colors.textTertiary,
-                        )
-                        Spacer(Modifier.width(space.md))
-                    }
-                    Text(
-                        text = "★ ${repo.stargazersCount}",
-                        style = type.labelSmall,
-                        color = colors.textTertiary,
-                    )
-                    Spacer(Modifier.width(space.md))
-                    Text(
-                        text = "⑂ ${repo.forksCount}",
-                        style = type.labelSmall,
-                        color = colors.textTertiary,
-                    )
-                    if (repo.openIssuesCount > 0) {
-                        Spacer(Modifier.width(space.md))
-                        Text(
-                            text = "● ${repo.openIssuesCount}",
-                            style = type.labelSmall,
-                            color = colors.textTertiary,
-                        )
-                    }
-                }
-            }
-            IconButton(onClick = onMenu) {
-                Icon(
-                    imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = "Repository actions",
-                    modifier = Modifier.size(18.dp),
-                    tint = colors.textTertiary,
                 )
             }
         }

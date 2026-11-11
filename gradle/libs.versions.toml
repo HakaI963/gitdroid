@@ -2,6 +2,7 @@
 agp = "8.10.1"
 kotlin = "2.2.21"
 composeBom = "2025.06.01"
+composeScreenshot = "0.0.1-alpha10"
 coreKtx = "1.16.0"
 activityCompose = "1.10.1"
 lifecycle = "2.9.4"
@@ -14,6 +15,10 @@ okhttp = "4.12.0"
 coil = "2.7.0"
 zxing = "3.5.3"
 junit = "4.13.2"
+robolectric = "4.14.1"
+androidxTest = "1.6.1"
+androidxTestExt = "1.2.1"
+androidxTestCore = "1.6.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,9 +50,14 @@ zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" 
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" }
+androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+compose-screenshot = { id = "com.android.compose.screenshot", version.ref = "composeScreenshot" }
