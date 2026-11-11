@@ -50,10 +50,28 @@ class ScreenshotTest {
                 }
             }
         }
-        compose.waitForIdle()
+        // Robolectric does not run the frame clock the way a device does, so
+        // the clock is driven by hand instead of waiting for idle.
+        compose.mainClock.advanceTimeBy(600)
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         val dir = File("build/screenshots").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { out ->
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+        }
+    }
+
+    /** A sanity check: if even a `Text` cannot be captured, the harness is broken. */
+    @Test
+    fun harnessWorks() {
+        compose.setContent {
+            GitDroidTheme(themeMode = ThemeMode.DARK) {
+                androidx.compose.material3.Text("GitDroid")
+            }
+        }
+        compose.mainClock.advanceTimeBy(200)
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        val dir = File("build/screenshots").apply { mkdirs() }
+        File(dir, "00-harness.png").outputStream().use { out ->
             bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
         }
     }
