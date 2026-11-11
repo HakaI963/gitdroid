@@ -23,8 +23,11 @@ permissions:
   contents: read
 
 # Never auto-cancel: a superseded push to main must still finish, or main is
-# left unverified. Interpolating a boolean here reads back as a non-empty
-# string and behaves as true, so it is left out deliberately.
+# left unverified. Two GitHub quirks are worth knowing before changing this:
+# an interpolated boolean (`${{ ... }}`) reads back as a non-empty string and
+# therefore behaves as true, and a run still *queued* in a group is replaced
+# by the next push whether or not cancellation is on — so pushing a burst of
+# commits to a congested runner queue cancels your own builds.
 concurrency:
   group: apk-${{ github.ref }}
 

@@ -64,6 +64,19 @@ error as a banner — never blank the list.
 **One source of truth.** The UI and the MCP server read the same
 `GitRepository`. An agent and a human must never disagree about the repo list.
 
+**Unwrap the Actions endpoints.** `actions/workflows`, `actions/runs`,
+`actions/runs/{id}/jobs` and `.../artifacts` all return
+`{"total_count":n,"<key>":[…]}`, not a bare array. Decode them with
+`GitHubApi.getWrapped(path, key)`. Decoding them as arrays throws, and because
+the repository layer catches, the screen silently shows an empty list — which
+is how the Actions tab looked broken with no error anywhere.
+`ResponseShapeTest` pins every one of these shapes.
+
+**A screenshot must render the real component.** `ShellScreenshotTest` and
+`ScreenshotTest` use the app's own `ShellTabBar`, `TopLevelDestination`,
+`ActionsTab` and `RepoDetailScreen`. A capture of a hand-built stand-in only
+proves the stand-in, and the shipped screen can regress unnoticed.
+
 **The MCP tool names are the official ones.** Do not rename them; agents
 carry instructions that reference `search_repositories` and friends.
 

@@ -27,6 +27,10 @@ gh run list
 gh run download
 ```
 
+Push once and wait rather than pushing a burst of commits: a run that is still
+queued in the concurrency group is replaced by the next push, so rapid pushes
+cancel your own builds before a runner ever picks them up.
+
 To build locally you need JDK 17 and the Android SDK (platform 36,
 build-tools 36.0.0):
 
@@ -70,6 +74,7 @@ app/src/main/java/dev/gitdroid/app/
 ├── MainActivity.kt         The single activity
 ├── core/
 │   ├── api/                GitHub REST client and DTOs
+│   │                       (note: Actions endpoints wrap their arrays)
 │   ├── auth/               Device flow, PAT, Keystore-backed token storage
 │   ├── cache/              Disk cache — the reason screens never reload empty
 │   ├── download/           Downloads to shared storage
