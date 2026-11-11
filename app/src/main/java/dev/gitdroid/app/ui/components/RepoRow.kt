@@ -98,13 +98,17 @@ fun RepoRow(
                     horizontalArrangement = Arrangement.spacedBy(space.md),
                 ) {
                     if (repo.language != null) {
-                        StatusDot(color = languageColor(repo.language))
-                        Spacer(Modifier.width(space.xs))
-                        Text(
-                            text = repo.language,
-                            style = type.labelSmall,
-                            color = colors.textTertiary,
-                        )
+                        // The dot and its label are one group: the row's
+                        // spacing must not separate them.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            StatusDot(color = languageColor(repo.language))
+                            Spacer(Modifier.width(space.xs))
+                            Text(
+                                text = repo.language,
+                                style = type.labelSmall,
+                                color = colors.textTertiary,
+                            )
+                        }
                     }
                     MetaStat(
                         icon = Icons.Rounded.Star,
