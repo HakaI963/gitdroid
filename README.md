@@ -117,14 +117,23 @@ live in the app's MCP tab too, and in [`docs/MCP.md`](docs/MCP.md).
 - Per-repo branch selection that survives restarts
 
 **Code**
-- File tree browser with an in-app editor that commits back to your branch
-- Markdown rendered, code in monospace, images previewed
-- Download any file, or the whole repository as a zip, to shared storage
+- A real directory browser — folders descend, the breadcrumb walks back up
+- The README rendered under the file listing, the way github.com shows it
+- Language bar (proportional to bytes per language), contributor strip,
+  stars/forks/watchers, and the latest commit with its author and date
+- Branch picker with protected-branch markers and branch creation
+- In-app editor that commits straight back to your branch
+- Markdown rendered, code in monospace with line numbers, images previewed
+- Clone sheet with HTTPS, SSH and `gh repo clone`, each one tap to copy
 
 **Issues, pull requests, Actions, releases**
-- Issue list with labels, pull request list with diff stats
-- Workflow runs with their status, re-run, cancel and dispatch
-- Releases with their assets
+- Issue and pull request lists with labels, diff stats and review state
+- New-issue and new-pull-request sheets, in-repo
+- Issue and pull request detail with comments and a composer
+- Actions: the workflow files in the repo, runs filterable by status and by
+  workflow, run detail with every job and step, re-run and cancel
+- Releases that expand to their notes, their assets as download rows, and
+  both source archives (`zip` and `tar.gz`)
 
 **Search**
 - Public repository search and public code search
