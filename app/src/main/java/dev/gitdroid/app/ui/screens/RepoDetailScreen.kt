@@ -243,10 +243,6 @@ fun RepoDetailScreen(
                     repo = repo,
                     branch = currentBranch,
                     onOpenFile = onOpenFile,
-                    onBranchChange = { newBranch ->
-                        repository.selectBranch(repo.fullName, newBranch)
-                        branchSheet = false
-                    },
                     onRequestBranchSheet = { branchSheet = true },
                 )
 
@@ -280,6 +276,20 @@ fun RepoDetailScreen(
                 )
             }
         }
+    }
+
+    if (branchSheet) {
+        BranchPickerSheet(
+            repository = repository,
+            owner = repo.ownerLogin,
+            repo = repo.name,
+            currentBranch = currentBranch,
+            onPick = { newBranch ->
+                repository.selectBranch(repo.fullName, newBranch)
+                branchSheet = false
+            },
+            onDismiss = { branchSheet = false },
+        )
     }
 
     if (settingsOpen) {
@@ -407,7 +417,6 @@ private fun CodeTab(
     repo: Repository,
     branch: String,
     onOpenFile: (String) -> Unit,
-    onBranchChange: (String) -> Unit,
     onRequestBranchSheet: () -> Unit,
 ) {
     val space = LocalSpace.current

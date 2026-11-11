@@ -28,8 +28,11 @@ class GitDroidApp : Application() {
             }
         }
 
-        // The MCP endpoint is useful even when the UI is not on screen.
-        McpService.start(this)
+        // The MCP endpoint is useful even when the UI is not on screen —
+        // unless the user turned it off.
+        if (container.settings.mcpEnabledOnStart) {
+            McpService.start(this)
+        }
     }
 
     override fun onTerminate() {

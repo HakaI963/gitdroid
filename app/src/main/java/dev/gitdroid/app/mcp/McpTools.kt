@@ -458,6 +458,33 @@ class McpTools(
      * for: the model should see the failure and be able to correct itself.
      */
     suspend fun call(name: String, arguments: JsonObject): CallToolResult = try {
+        val definition = tools.firstOrNull { it.name == name }
+            ?: return errorResult("Unknown tool: $name")
+
+        // Report every missing argument at once. Reporting only the first
+        // one would make the agent fix its arguments one round trip at a
+        // time, which is exactly the kind of friction an MCP server should
+        // not have.
+        val missing = definition.inputSchema.required.filter { arguments.string(it).isNullOrBlank() }
+        if (missing.isNotEmpty()) {
+            val list = missing.joinToString(", ") { "`$it`" }
+            errorResult(
+                if (missing.size == 1) {
+                    "`${missing.first()}` is required"
+                } else {
+                    "Missing required arguments: $list"
+                },
+            )
+        } else {
+            dispatch(name, arguments)
+        }
+    } catch (e: GitHubException) {
+        errorResult(e.displayMessage())
+    } catch (e: Exception) {
+        errorResult(e.message ?: "The tool failed")
+    }
+
+    private suspend fun dispatch(name: String, arguments: JsonObject): CallToolResult =
         when (name) {
             "search_repositories" -> searchRepositories(arguments)
             "search_code" -> searchCode(arguments)
@@ -489,11 +516,6 @@ class McpTools(
             "get_repository_tree" -> getRepositoryTree(arguments)
             else -> errorResult("Unknown tool: $name")
         }
-    } catch (e: GitHubException) {
-        errorResult(e.displayMessage())
-    } catch (e: Exception) {
-        errorResult(e.message ?: "The tool failed")
-    }
 
     // ── Implementations ─────────────────────────────────────────────────────
 

@@ -1,5 +1,6 @@
 package dev.gitdroid.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -92,6 +93,24 @@ fun GitDroidApp(
     // Restore the saved theme and measure the cache once, off the hot path.
     LaunchedEffect(Unit) {
         cacheSize = container.diskCache.sizeBytes()
+    }
+
+    /**
+     * The back button pops the navigation stack.
+     *
+     * The stack is shallow — file, then issue, then repository, then the
+     * tabs — so it is written out explicitly rather than pulled in from a
+     * navigation library.
+     */
+    BackHandler(enabled = showBack || filePath != null || issueNumber != null) {
+        when {
+            filePath != null -> filePath = null
+            issueNumber != null -> issueNumber = null
+            repo != null -> {
+                repo = null
+                showBack = false
+            }
+        }
     }
 
     when (val current = session) {

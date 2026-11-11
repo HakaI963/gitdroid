@@ -70,13 +70,16 @@ class AppContainer(context: Context) {
      * point of view.
      */
     fun enableMcp() {
+        settings.mcpEnabledOnStart = true
         if (mcpServer?.isRunning != true) {
             val server = McpServer(
                 tools = mcpTools,
                 scope = scope,
                 bearerToken = { secureStore.mcpToken },
             )
-            val port = runCatching { server.start() }.getOrNull()
+            val port = runCatching { server.start() }
+                .recoverCatching { server.start(port = 0) }
+                .getOrNull()
             if (port != null) {
                 mcpServer = server
                 _mcpPort.value = port
@@ -88,6 +91,7 @@ class AppContainer(context: Context) {
 
     /** Turns the MCP endpoint off and stops the foreground service. */
     fun disableMcp() {
+        settings.mcpEnabledOnStart = false
         McpService.stop(appContext)
         stopMcpServer()
     }
